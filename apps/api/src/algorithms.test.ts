@@ -4,10 +4,14 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 
-process.env.DB_PATH = path.join(os.tmpdir(), `trains-test-${process.pid}.db`);
-const { seed } = await import('./seed.js');
-const { autoPick, trainSeats, trainWagons, planReseat } = await import('./seats.js');
-const { makeToken, readToken, all } = await import('./db.js');
+import { openDatabase } from './node-db.js';
+import { seed } from './core/seed.js';
+import { autoPick, trainSeats, trainWagons, planReseat } from './core/seats.js';
+import { makeToken, readToken } from './core/util.js';
+import { all } from './core/sql.js';
+import { handle } from './core/routes.js';
+
+openDatabase(path.join(os.tmpdir(), `trains-test-${process.pid}.db`));
 seed(true);
 
 test('auto-pick keeps a party of 4 together in one group', () => {
@@ -60,4 +64,24 @@ test('re-seating moves every passenger when a trip changes train', () => {
   assert.equal(plan.kept + plan.moves.length, n);
   const targets = plan.moves.map((m) => m.to).filter(Boolean);
   assert.equal(new Set(targets).size, targets.length, 'no two passengers on the same seat');
+});
+
+test('API: a seat cannot be held or sold twice', () => {
+  const trip = all<{ id: number; departure: string }>(`SELECT id, departure FROM trips WHERE train_id = 2 ORDER BY departure DESC LIMIT 1`)[0];
+  const free = trainSeats(2).map((x) => x.key).find((k) => !all(`SELECT 1 FROM tickets WHERE trip_id = ? AND seat_key = ?`, trip.id, k).length)!;
+  const a = handle('PUT', `/api/trips/${trip.id}/hold`, {}, { session: 'A', seatKeys: [free] });
+  assert.deepEqual((a.body as any).held, [free]);
+  const b = handle('PUT', `/api/trips/${trip.id}/hold`, {}, { session: 'B', seatKeys: [free] });
+  assert.deepEqual((b.body as any).conflicts, [free]);
+  const ok = handle('POST', '/api/bookings', {}, { session: 'A', tripId: trip.id, seats: [{ seatKey: free, type: 'ADULT' }], contact: { name: 'Test', email: 't@example.com' } });
+  assert.equal(ok.status, 200);
+  const again = handle('POST', '/api/bookings', {}, { session: 'B', tripId: trip.id, seats: [{ seatKey: free, type: 'ADULT' }], contact: { name: 'X', email: 'x@example.com' } });
+  assert.equal(again.status, 409);
+});
+
+test('API: staff routes require the right role', () => {
+  assert.equal(handle('GET', '/api/admin/stats', {}, undefined).status, 401);
+  const login = handle('POST', '/api/auth/login', {}, { username: 'conductor', password: 'conductor123' }).body as any;
+  assert.equal(handle('GET', '/api/admin/stats', {}, undefined, `Bearer ${login.token}`).status, 200);
+  assert.equal(handle('POST', '/api/admin/trips', {}, {}, `Bearer ${login.token}`).status, 403);
 });

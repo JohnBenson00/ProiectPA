@@ -19,10 +19,21 @@ For development with hot reload: `npm run dev` (web on http://localhost:5173, AP
 
 | Command | What it does |
 |---|---|
+| `npm run build:pages -w apps/web` | Static build for GitHub Pages (no server needed, see below) |
 | `npm run seed` | Reset the database: 3 trains, 14 wagons, 5 routes, ~800 departures, demo bookings |
 | `npm test` | Unit tests for the algorithms (seat auto-pick, re-seating, ticket signatures) |
 
 Staff accounts: `admin / admin123` (everything) and `conductor / conductor123` (scanner + seat maps).
+
+## Live demo (GitHub Pages)
+
+GitHub Pages only serves static files, so the Pages build runs **the same API code in the browser**:
+the route table (`apps/api/src/core/routes.ts`) runs on SQLite compiled to WebAssembly (sql.js).
+Every visitor gets their own demo database, saved in the browser (IndexedDB), so bookings survive a reload.
+The Node server (`npm start`) uses exactly the same core with `node:sqlite`.
+
+Deploy: build with `npm run build:pages -w apps/web` (output in `apps/web/dist-pages`, base path `/ProiectPA/`),
+then publish that folder on the `gh-pages` branch and select it under *Settings → Pages*.
 
 ## What it does
 
@@ -65,15 +76,17 @@ Staff accounts: `admin / admin123` (everything) and `conductor / conductor123` (
 ## Algorithms (our own)
 | Algorithm | Where |
 |---|---|
-| Best seats together: scores groups (compartments / table bays / rows, and neighbouring groups) by togetherness, preferences, isolated seats left over, and wagon load | `apps/api/src/seats.ts` → `autoPick` |
+| Best seats together: scores groups (compartments / table bays / rows, and neighbouring groups) by togetherness, preferences, isolated seats left over, and wagon load | `apps/api/src/core/seats.ts` → `autoPick` |
 | Re-seating when a trip changes train: keeps seats that still exist, moves the rest to the most similar seats, keeps bookings in the same wagon | `planReseat` |
 | Temporary seat holds with expiry, plus a unique DB index, so no seat can be sold twice | `PUT /api/trips/:id/hold`, `tickets_seat` index |
-| Signed tickets (HMAC). The QR code holds no personal data. Scanning is atomic (`VALID → USED`), so a ticket can't be used twice | `db.ts` → `makeToken/readToken`, `/api/admin/scan` |
+| Signed tickets (HMAC). The QR code holds no personal data. Scanning is atomic (`VALID → USED`), so a ticket can't be used twice | `core/util.ts` → `makeToken/readToken`, `/api/admin/scan` |
 | Recurring schedule generation, idempotent | `/api/admin/schedule` |
 
 ## Structure
 ```
-apps/api   Express + SQLite API (layouts.ts = wagon seat plans, seats.ts = algorithms, server.ts = routes)
-apps/web   React + TypeScript + Vite (components/TrainMap, WagonPlan, TrainStrip; pages/…; i18n.tsx)
+apps/api   API. src/core = runtime-independent logic (layouts.ts seat plans, seats.ts algorithms,
+           routes.ts route table, sql.ts database facade); server.ts / node-db.ts = Node + Express adapter
+apps/web   React + TypeScript + Vite (components/TrainMap, WagonPlan, TrainStrip; pages/…; i18n.tsx;
+           local/localServer.ts = in-browser API for the static demo)
 docs/      Project plan
 ```

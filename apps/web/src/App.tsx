@@ -1,25 +1,30 @@
-import { lazy, Suspense } from 'react';
-import { NavLink, Route, Routes, Link } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { NavLink, Route, Routes, Link, useLocation } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Book } from './pages/Book';
 import { TicketPage, ManageBooking } from './pages/Ticket';
 import { Trains, TrainInfo } from './pages/Trains';
 import { useLang, useT } from './i18n';
+import { LOCAL_API } from './api';
 
 const Admin = lazy(() => import('./pages/admin/Admin').then((m) => ({ default: m.Admin })));
 
 export function App() {
   const t = useT();
   const { lang, setLang } = useLang();
+  const [menu, setMenu] = useState(false);
+  const loc = useLocation();
+  useEffect(() => setMenu(false), [loc.pathname]);
   return (
     <>
       <a href="#main" className="skip">{t('Skip to content')}</a>
       <header className="topbar no-print">
         <Link to="/" className="brand" aria-label="Râșnov Trains">
-          <img src="/favicon.svg" width={24} height={24} alt="" />
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} width={22} height={22} alt="" />
           <span>Râșnov <b>Trains</b></span>
         </Link>
-        <nav className="topnav" aria-label={t('Main')}>
+        <button className="menu-btn" aria-expanded={menu} aria-controls="topnav" onClick={() => setMenu((m) => !m)}>{t('Menu')}</button>
+        <nav id="topnav" className={`topnav${menu ? ' is-open' : ''}`} aria-label={t('Main')}>
           <NavLink to="/" end>{t('Departures')}</NavLink>
           <NavLink to="/trains">{t('Trains')}</NavLink>
           <NavLink to="/booking">{t('My tickets')}</NavLink>
@@ -45,6 +50,7 @@ export function App() {
       </div>
       <footer className="footer no-print">
         <span>Râșnov Trains · {t('Student project prototype – prices and payments are fictional.')}</span>
+        {LOCAL_API && <span> {t('Demo: bookings are stored only in this browser.')}</span>}
       </footer>
     </>
   );

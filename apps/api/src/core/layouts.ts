@@ -41,7 +41,8 @@ export interface Layout {
 }
 
 export const WIDTH = 5;
-const SEAT_W = 0.95;
+/** every seat in every coach type has the same footprint */
+const SEAT_W = 0.9;
 const SEAT_H = 0.9;
 
 function doors(cells: Cell[], xs: number[]) {
@@ -59,29 +60,30 @@ function saloon(code: string, name: string, quiet: boolean): Layout {
   cells.push({ x: 1.6, y: 0.1, w: 1.6, h: 1.8, type: 'WC' });
   cells.push({ x: 1.6, y: 3.1, w: 1.6, h: 1.8, type: 'LUGGAGE' });
   x = 3.7;
-  let n = 1;
-  const addRow = (rx: number, facing: 'L' | 'R', table: boolean, bay: number) => {
+  // CFR-style numbering: the bay is the tens digit, positions 1-4 / 5-8 run window to window
+  const addRow = (rx: number, facing: 'L' | 'R', table: boolean, bay: number, second: boolean) => {
     rows.forEach((ry, i) => {
       const attrs = [i === 0 || i === 3 ? 'WINDOW' : 'AISLE', facing === 'L' ? 'FORWARD' : 'BACKWARD'];
       if (table) attrs.push('TABLE');
       if (quiet) attrs.push('QUIET');
       if (bay === 0) attrs.push('NEAR_WC');
-      cells.push({ x: rx, y: ry, w: SEAT_W, h: SEAT_H, type: 'SEAT', label: String(n++), attrs, facing, group: `b${bay}${i < 2 ? 'L' : 'R'}` });
+      const label = `${bay + 1}${(second ? 5 : 1) + i}`;
+      cells.push({ x: rx, y: ry, w: SEAT_W, h: SEAT_H, type: 'SEAT', label, attrs, facing, group: `b${bay}${i < 2 ? 'L' : 'R'}` });
     });
   };
   for (let b = 0; b < 8; b++) {
     if (b % 2 === 0) {
       // facing bay: backward row, table, forward row
-      addRow(x, 'R', true, b);
-      cells.push({ x: x + 1.05, y: 0.15, w: 0.5, h: 1.7, type: 'TABLE' });
-      cells.push({ x: x + 1.05, y: 3.15, w: 0.5, h: 1.7, type: 'TABLE' });
-      addRow(x + 1.65, 'L', true, b);
-      x += 2.95;
+      addRow(x, 'R', true, b, false);
+      cells.push({ x: x + 1.0, y: 0.15, w: 0.5, h: 1.7, type: 'TABLE' });
+      cells.push({ x: x + 1.0, y: 3.15, w: 0.5, h: 1.7, type: 'TABLE' });
+      addRow(x + 1.6, 'L', true, b, true);
+      x += 2.9;
     } else {
       // airline rows: both facing forward
-      addRow(x, 'L', false, b);
-      addRow(x + 1.15, 'L', false, b);
-      x += 2.45;
+      addRow(x, 'L', false, b, false);
+      addRow(x + 1.1, 'L', false, b, true);
+      x += 2.4;
     }
   }
   const length = x + 1.6;
@@ -102,14 +104,14 @@ function firstClass(): Layout {
   cells.push({ x: 1.6, y: 0.1, w: 1.6, h: 1.8, type: 'WC' });
   cells.push({ x: 1.6, y: 2.1, w: 1.6, h: 1.6, type: 'LUGGAGE' });
   let x = 3.5;
-  const seatYs = [0.25, 1.35, 2.45]; // window, middle, corridor
+  const seatYs = [0.3, 1.38, 2.46]; // window, middle, corridor
   for (let c = 1; c <= 8; c++) {
     cells.push({ x, y: 0.05, w: 3.0, h: 3.65, type: 'ROOM', label: String(c), group: `c${c}` });
-    cells.push({ x: x + 1.25, y: 0.15, w: 0.5, h: 0.75, type: 'TABLE' });
+    cells.push({ x: x + 1.2, y: 0.2, w: 0.6, h: 0.7, type: 'TABLE' });
     seatYs.forEach((y, i) => {
       const pos = i === 0 ? 'WINDOW' : i === 2 ? 'AISLE' : 'MIDDLE';
-      cells.push({ x: x + 0.15, y, w: SEAT_W, h: 1.0, type: 'SEAT', label: `${c}${i + 1}`, facing: 'R', group: `c${c}`, attrs: [pos, 'BACKWARD', 'COMPARTMENT', ...(i === 0 ? ['TABLE'] : [])] });
-      cells.push({ x: x + 1.9, y, w: SEAT_W, h: 1.0, type: 'SEAT', label: `${c}${i + 4}`, facing: 'L', group: `c${c}`, attrs: [pos, 'FORWARD', 'COMPARTMENT', ...(i === 0 ? ['TABLE'] : [])] });
+      cells.push({ x: x + 0.2, y, w: SEAT_W, h: SEAT_H, type: 'SEAT', label: `${c}${i + 1}`, facing: 'R', group: `c${c}`, attrs: [pos, 'BACKWARD', 'COMPARTMENT', ...(i === 0 ? ['TABLE'] : [])] });
+      cells.push({ x: x + 1.9, y, w: SEAT_W, h: SEAT_H, type: 'SEAT', label: `${c}${i + 4}`, facing: 'L', group: `c${c}`, attrs: [pos, 'FORWARD', 'COMPARTMENT', ...(i === 0 ? ['TABLE'] : [])] });
     });
     x += 3.0;
   }
@@ -211,16 +213,15 @@ function multi(): Layout {
   cells.push({ x: 1.7, y: 2.9, w: 1.25, h: 2.0, type: 'WHEELCHAIR', label: '81', group: 'acc', attrs: ['ACCESSIBLE', 'NEAR_WC', 'FORWARD'] });
   cells.push({ x: 3.05, y: 2.9, w: 1.25, h: 2.0, type: 'WHEELCHAIR', label: '82', group: 'acc', attrs: ['ACCESSIBLE', 'NEAR_WC', 'FORWARD'] });
   // companion seats right after the wheelchair area
-  let n = 1;
   let x = 4.6;
   const rows = [0.1, 1.0, 3.1, 4.0];
-  const addRow = (rx: number, facing: 'L' | 'R', group: string, extra: string[]) => {
+  const addRow = (rx: number, facing: 'L' | 'R', group: string, extra: string[], bay: number, second: boolean) => {
     rows.forEach((ry, i) => {
       const attrs = [i === 0 || i === 3 ? 'WINDOW' : 'AISLE', facing === 'L' ? 'FORWARD' : 'BACKWARD', ...extra];
-      cells.push({ x: rx, y: ry, w: SEAT_W, h: SEAT_H, type: 'SEAT', label: String(n++), attrs, facing, group: `${group}${i < 2 ? 'L' : 'R'}` });
+      cells.push({ x: rx, y: ry, w: SEAT_W, h: SEAT_H, type: 'SEAT', label: `${bay}${(second ? 5 : 1) + i}`, attrs, facing, group: `${group}${i < 2 ? 'L' : 'R'}` });
     });
   };
-  addRow(x, 'L', 'comp', ['ACCESSIBLE', 'NEAR_WC']);
+  addRow(x, 'L', 'comp', ['ACCESSIBLE', 'NEAR_WC'], 1, false);
   x += 1.4;
   cells.push({ x, y: 0.1, w: 3.2, h: 1.8, type: 'BIKE' });
   cells.push({ x, y: 3.1, w: 3.2, h: 1.8, type: 'STROLLER' });
@@ -229,11 +230,11 @@ function multi(): Layout {
   cells.push({ x, y: 3.1, w: 3.0, h: 1.8, type: 'LUGGAGE' });
   x += 3.3;
   for (let b = 0; b < 3; b++) {
-    addRow(x, 'R', `f${b}`, ['TABLE', 'FAMILY']);
-    cells.push({ x: x + 1.05, y: 0.15, w: 0.5, h: 1.7, type: 'TABLE' });
-    cells.push({ x: x + 1.05, y: 3.15, w: 0.5, h: 1.7, type: 'TABLE' });
-    addRow(x + 1.65, 'L', `f${b}`, ['TABLE', 'FAMILY']);
-    x += 2.95;
+    addRow(x, 'R', `f${b}`, ['TABLE', 'FAMILY'], b + 2, false);
+    cells.push({ x: x + 1.0, y: 0.15, w: 0.5, h: 1.7, type: 'TABLE' });
+    cells.push({ x: x + 1.0, y: 3.15, w: 0.5, h: 1.7, type: 'TABLE' });
+    addRow(x + 1.6, 'L', `f${b}`, ['TABLE', 'FAMILY'], b + 2, true);
+    x += 2.9;
   }
   const length = x + 1.5;
   doors(cells, [0.3, length - 1.4]);
@@ -251,14 +252,14 @@ function panoramic(): Layout {
   cells.push({ x: 1.6, y: 0.1, w: 2.2, h: 1.8, type: 'BAR' });
   cells.push({ x: 1.6, y: 3.1, w: 2.2, h: 1.8, type: 'WC' });
   let x = 4.2;
-  let n = 1;
   for (let r = 0; r < 14; r++) {
-    const ys: Array<[number, string]> = [[0.1, 'WINDOW'], [1.0, 'AISLE'], [3.9, 'WINDOW']];
-    for (const [y, pos] of ys) {
+    const ys: Array<[number, string]> = [[0.1, 'WINDOW'], [1.0, 'AISLE'], [4.0, 'WINDOW']];
+    ys.forEach(([y, pos], i) => {
       const attrs = [pos, 'FORWARD', 'PANORAMIC'];
-      if (y === 3.9) attrs.push('SOLO');
-      cells.push({ x, y, w: SEAT_W, h: SEAT_H, type: 'SEAT', label: String(n++), attrs, facing: 'L', group: `r${r}${y < 2 ? 'L' : 'R'}` });
-    }
+      if (y === 4.0) attrs.push('SOLO');
+      const label = `${Math.floor(r / 2) + 1}${(r % 2) * 3 + i + 1}`;
+      cells.push({ x, y, w: SEAT_W, h: SEAT_H, type: 'SEAT', label, attrs, facing: 'L', group: `r${r}${y < 2 ? 'L' : 'R'}` });
+    });
     x += 1.3;
   }
   const length = x + 1.5;

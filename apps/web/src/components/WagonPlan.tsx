@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Accessibility, Baby, Bike } from 'lucide-react';
+import { Accessibility } from 'lucide-react';
 import type { Cell, Layout, SeatState } from '../types';
 import { useT } from '../i18n';
 import { SEAT_ATTRS } from '../amenities';
@@ -107,15 +107,28 @@ export function WagonPlan({ layout, wagonId, wagonNumber, stateOf, onSeat, dimme
   const levelLetter = (l?: string) => (l === 'L' ? t('L') : l === 'M' ? t('M') : l === 'U' ? t('U') : '');
   const fsLabel = Math.max(8.5, Math.min(10.5, S * 0.32));
 
-  const label = (b: Box, text: string, icon?: ReactNode) => (
+  /** one or two lines of text centred in an area */
+  const label = (b: Box, text: string, sub?: string) => (
     <>
-      {icon}
-      <text x={b.X + b.W / 2} y={b.Y + b.H / 2 + (icon ? 9 : 0)} className="plan-label" style={{ fontSize: fsLabel }} textAnchor="middle" dominantBaseline="central">{text}</text>
+      <text x={b.X + b.W / 2} y={b.Y + b.H / 2 - (sub ? 6 : 0)} className="plan-label" style={{ fontSize: fsLabel }} textAnchor="middle" dominantBaseline="central">{text}</text>
+      {sub && <text x={b.X + b.W / 2} y={b.Y + b.H / 2 + 7} className="plan-label plan-label--sub" style={{ fontSize: fsLabel - 1 }} textAnchor="middle" dominantBaseline="central">{sub}</text>}
     </>
   );
-  const smallIcon = (Icon: typeof Bike, b: Box) => {
-    const s = Math.min(16, b.W * 0.45, b.H * 0.45);
-    return <Icon x={b.X + b.W / 2 - s / 2} y={b.Y + b.H / 2 - s / 2 - 6} width={s} height={s} className="plan-icon" strokeWidth={1.6} aria-hidden />;
+  /** an enclosed room (WC, staff, kitchen) with its door on the aisle side */
+  const room = (c: Cell, i: number, text: string, sub?: string, title?: string) => {
+    const b = box(c);
+    const aisleBelow = c.y + c.h / 2 < Wd / 2;
+    const edge = aisleBelow ? c.y + c.h : c.y;
+    const dw = Math.min(0.75, c.w * 0.5);
+    const d0 = c.x + (c.w - dw) / 2;
+    return (
+      <g key={i}>
+        <rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-room plan-room--fill" />
+        <line {...line(d0, edge, d0 + dw, edge)} className="plan-door-gap plan-door-gap--room" />
+        {label(b, text, sub)}
+        {title && <title>{title}</title>}
+      </g>
+    );
   };
 
   const decor = (c: Cell, i: number) => {
@@ -155,23 +168,23 @@ export function WagonPlan({ layout, wagonId, wagonNumber, stateOf, onSeat, dimme
       case 'SINK':
         return <circle key={i} cx={b.X + b.W / 2} cy={b.Y + b.H / 2} r={Math.min(b.W, b.H) / 2.6} className="plan-sink" />;
       case 'WC':
-        return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-room plan-room--fill" />{label(b, 'WC')}<title>{t('Toilet')}</title></g>;
+        return room(c, i, 'WC', undefined, t('Toilet'));
       case 'WC_ACC':
-        return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-room plan-room--fill" />{label(b, 'WC', smallIcon(Accessibility, b))}<title>{t('Accessible toilet')}</title></g>;
+        return room(c, i, 'WC', t('accessible'), t('Accessible toilet'));
+      case 'KITCHEN':
+        return room(c, i, t('Kitchen'));
+      case 'STAFF':
+        return room(c, i, t('Staff'));
       case 'LUGGAGE':
         return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-area" style={{ fill: `url(#hatch-${uid})` }} />{label(b, t('Luggage'))}</g>;
       case 'BIKE':
-        return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-area" />{label(b, t('Bicycles'), smallIcon(Bike, b))}</g>;
+        return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-area" />{label(b, t('Bicycles'))}</g>;
       case 'STROLLER':
-        return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-area" />{label(b, t('Strollers'), smallIcon(Baby, b))}</g>;
+        return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-area" />{label(b, t('Strollers'))}</g>;
       case 'PLAY':
         return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-area" />{label(b, t('Kids corner'))}</g>;
-      case 'KITCHEN':
-        return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-room plan-room--fill" />{label(b, t('Kitchen'))}</g>;
       case 'BAR':
         return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} rx={1.5} className="plan-bar" />{label(b, t('Bar'))}</g>;
-      case 'STAFF':
-        return <g key={i}><rect x={b.X} y={b.Y} width={b.W} height={b.H} className="plan-room plan-room--fill" />{label(b, t('Staff'))}</g>;
       default:
         return null;
     }
@@ -227,7 +240,7 @@ export function WagonPlan({ layout, wagonId, wagonNumber, stateOf, onSeat, dimme
             : <rect x={b.X + 4} y={b.Y + b.H * 0.2} width={Math.min(6, b.W * 0.14)} height={b.H * 0.6} rx={2} className="seat-pillow" />
         )}
         {c.type === 'WHEELCHAIR' && (
-          <Accessibility x={b.X + b.W / 2 - 8} y={b.Y + b.H / 2 - 17} width={16} height={16} className="seat-icon" strokeWidth={1.7} aria-hidden />
+          <Accessibility x={b.X + b.W / 2 - 7} y={b.Y + b.H / 2 - 15} width={14} height={14} className="seat-icon" strokeWidth={1.6} aria-hidden />
         )}
         <text x={cx} y={cy + (c.type === 'WHEELCHAIR' ? 9 : 0)} className="seat-label" style={{ fontSize: fs }}
           dominantBaseline="central" textAnchor="middle">{c.label}</text>

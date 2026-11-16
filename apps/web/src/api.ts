@@ -1,3 +1,6 @@
+/** true in the GitHub Pages build, where there is no server */
+export const LOCAL_API = import.meta.env.VITE_LOCAL_API === '1';
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public data: any) { super(message); }
 }
@@ -7,14 +10,23 @@ export function getStaffToken() {
 }
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
-  const headers: Record<string, string> = {};
-  if (opts.body !== undefined) headers['content-type'] = 'application/json';
   const tok = getStaffToken();
-  if (tok && path.startsWith('/api/admin')) headers.authorization = `Bearer ${tok}`;
-  const res = await fetch(path, { method: opts.method ?? 'GET', headers, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && path.startsWith('/api/admin')) window.dispatchEvent(new Event('staff-unauthorized'));
-  if (!res.ok) throw new ApiError(res.status, data.error ?? `Request failed (${res.status})`, data);
+  const auth = tok && path.startsWith('/api/admin') ? `Bearer ${tok}` : undefined;
+  let status: number, data: any;
+  if (LOCAL_API) {
+    // static demo build: the API runs in the browser (see local/localServer.ts)
+    const { localRequest } = await import('./local/localServer');
+    ({ status, body: data } = await localRequest(opts.method ?? 'GET', path, opts.body, auth));
+  } else {
+    const headers: Record<string, string> = {};
+    if (opts.body !== undefined) headers['content-type'] = 'application/json';
+    if (auth) headers.authorization = auth;
+    const res = await fetch(path, { method: opts.method ?? 'GET', headers, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
+    status = res.status;
+    data = await res.json().catch(() => ({}));
+  }
+  if (status === 401 && path.startsWith('/api/admin')) window.dispatchEvent(new Event('staff-unauthorized'));
+  if (status >= 400) throw new ApiError(status, data.error ?? `Request failed (${status})`, data);
   return data as T;
 }
 

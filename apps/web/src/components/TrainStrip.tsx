@@ -38,10 +38,12 @@ export function TrainStrip({ wagons, active, onSelect, compact, highlight, locoN
               <span className="coach-no">{w.number}</span>
               {w.classLabel && <span className="coach-cls" aria-hidden>{w.classLabel}</span>}
             </span>
-            {Icon && <Icon size={compact ? 12 : 15} className="coach-icon" strokeWidth={1.7} aria-hidden />}
-            {!compact && (
-              <span className="coach-free">
-                {!w.bookable ? t('no seats') : known ? `${w.free} ${t('free')}` : w.capacity !== undefined ? `${w.capacity} ${t('places')}` : ''}
+            {compact ? (Icon && <Icon size={12} className="coach-icon" strokeWidth={1.7} aria-hidden />) : (
+              <span className="coach-body">
+                {Icon && <Icon size={14} className="coach-icon" strokeWidth={1.7} aria-hidden />}
+                <span className="coach-free">
+                  {!w.bookable ? t('no seats') : known ? `${w.free} ${t('free')}` : w.capacity !== undefined ? `${w.capacity} ${t('places')}` : ''}
+                </span>
               </span>
             )}
             {!compact && w.bookable && known && (

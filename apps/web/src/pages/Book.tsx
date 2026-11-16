@@ -147,7 +147,7 @@ export function Book() {
       return;
     }
     setSel((p) => [...p, { key, type: 'ADULT' }]);
-    if (cell.type === 'WHEELCHAIR') say(t('Wheelchair space selected. Please also select a seat for your companion – seats 1–4 next to this area are best.'));
+    if (cell.type === 'WHEELCHAIR') say(t('Wheelchair space selected. Please also select a seat for your companion – seats 11–14 next to this area are best.'));
   };
 
   const wholeCompartment = (key: string) => {
@@ -207,11 +207,11 @@ export function Book() {
     const attrs = (c.attrs ?? []).filter((a) => SEAT_ATTRS[a]).map((a) => t(SEAT_ATTRS[a]));
     return (
       <>
-        <span className="tip-title">{t(c.type === 'BERTH' ? 'Berth' : c.type === 'WHEELCHAIR' ? 'Wheelchair space' : 'Seat')} {c.label} · {t('Wagon')} {w.number}</span>
+        <span className="tip-title">
+          {t(c.type === 'BERTH' ? 'Berth' : c.type === 'WHEELCHAIR' ? 'Wheelchair space' : 'Seat')} {c.label}
+          <span className="tip-right">{st === 'free' || st === 'selected' ? fmtMoney(trip.prices[w.layout]?.ADULT ?? 0) : t(`seat_${st}`)}</span>
+        </span>
         {attrs.length > 0 && <span className="tip-attrs">{attrs.join(', ')}</span>}
-        {st === 'free' || st === 'selected'
-          ? <span className="tip-price">{fmtMoney(trip.prices[w.layout]?.ADULT ?? 0)} <span className="muted">/ {t('Adult').toLowerCase()}</span></span>
-          : <span className="tip-state">{t(`seat_${st}`)}</span>}
       </>
     );
   };
@@ -244,7 +244,7 @@ export function Book() {
           <ol className="steps" aria-label={t('Steps')}>
             {(['seats', 'details', 'pay', 'ticket'] as const).map((s, i) => (
               <li key={s} className={i === stepIndex ? 'is-active' : i < stepIndex ? 'is-done' : ''} aria-current={i === stepIndex ? 'step' : undefined}>
-                <span className="step-no">{i + 1}</span>{t(`step_${s}`)}
+                <span className="step-no">{i + 1}</span><span className="step-text">{t(`step_${s}`)}</span>
               </li>
             ))}
           </ol>
@@ -280,8 +280,7 @@ export function Book() {
                   </div>
                 </fieldset>
                 <div className="tb-group tb-group--end">
-                  <button className="btn" onClick={autoPick} disabled={busy}>{t('Auto-assign seats')}</button>
-                  <span className="tb-hint">{prefs.length ? t('Uses your preferences') : t('Keeps your group together')}</span>
+                  <button className="btn" onClick={autoPick} disabled={busy} title={prefs.length ? t('Uses your preferences') : t('Keeps your group together')}>{t('Auto-assign seats')}</button>
                 </div>
               </div>
 
@@ -351,10 +350,15 @@ export function Book() {
               <Clock size={13} aria-hidden /> {t('Seats held for')} <span className="tabular">{mmss}</span>
             </p>
           )}
+          {sel.length > 0 && (
+            <div className="sel-cols" aria-hidden>
+              <span>{t('Place')}</span><span>{t('Fare type')}</span><span>{t('Price')}</span><span />
+            </div>
+          )}
           {sel.length === 0 ? (
             <p className="summary-empty">{t('Select seats on the plan or use automatic assignment.')}</p>
           ) : (
-            <ul className="sel-list">
+            <ul className="sel-list" aria-label={t('Selected places')}>
               {sel.map((s, i) => {
                 const info = index.get(s.key);
                 if (!info) return null;
@@ -365,24 +369,21 @@ export function Book() {
                 const attrs = (info.cell.attrs ?? []).filter((a) => SEAT_ATTRS[a] && a !== 'COMPARTMENT').slice(0, 2).map((a) => t(SEAT_ATTRS[a])).join(', ');
                 return (
                   <li key={s.key}>
-                    <div className="sel-top">
-                      <button className="sel-place" onClick={() => setActive(info.wagon.number)} title={t('Show on map')}>
-                        {t('Wagon')} {info.wagon.number}, {t(info.cell.type === 'BERTH' ? 'Berth' : 'Seat').toLowerCase()} {info.cell.label}
-                      </button>
-                      <span className="sel-price tabular">{fmtMoney(priceOf(s.key, s.type))}</span>
-                      {step === 'seats' && (
-                        <button className="sel-remove" onClick={() => setSel((p) => p.filter((x) => x.key !== s.key))} aria-label={t('Remove seat {s}', { s: info.cell.label! })}><X size={14} /></button>
-                      )}
-                    </div>
-                    <div className="sel-sub">
-                      <select aria-label={t('Passenger type for seat {s}', { s: info.cell.label! })} value={s.type} disabled={step !== 'seats'}
-                        onChange={(e) => setSel((p) => p.map((x, j) => (j === i ? { ...x, type: e.target.value } : x)))}>
-                        {types.map((pt) => <option key={pt.code} value={pt.code}>{t(pt.label)}</option>)}
-                      </select>
+                    <button className="sel-place" onClick={() => setActive(info.wagon.number)} title={t('Show on map')}>
+                      <span className="sel-coach">{t('W')}{info.wagon.number}</span>
+                      <span className="sel-seat">{info.cell.label}</span>
                       {attrs && <span className="sel-attrs">{attrs}</span>}
-                    </div>
+                    </button>
+                    <select aria-label={t('Passenger type for seat {s}', { s: info.cell.label! })} value={s.type} disabled={step !== 'seats'}
+                      onChange={(e) => setSel((p) => p.map((x, j) => (j === i ? { ...x, type: e.target.value } : x)))}>
+                      {types.map((pt) => <option key={pt.code} value={pt.code}>{t(pt.label)}</option>)}
+                    </select>
+                    <span className="sel-price tabular">{fmtMoney(priceOf(s.key, s.type))}</span>
+                    {step === 'seats'
+                      ? <button className="sel-remove" onClick={() => setSel((p) => p.filter((x) => x.key !== s.key))} aria-label={t('Remove seat {s}', { s: info.cell.label! })}><X size={14} /></button>
+                      : <span />}
                     {compKind && step === 'seats' && (
-                      <button className="link-btn" onClick={() => wholeCompartment(s.key)}>{t('Book the whole compartment')}</button>
+                      <button className="link-btn sel-comp" onClick={() => wholeCompartment(s.key)}>{t('Book the whole compartment')}</button>
                     )}
                   </li>
                 );
@@ -406,7 +407,7 @@ export function Book() {
         <div className="mobile-bar">
           <div>
             <b className="tabular">{fmtMoney(total)}</b>
-            <span className="muted"> · {sel.length}/{count} {t('places selected')}{remaining !== null && sel.length > 0 ? ` · ${mmss}` : ''}</span>
+            <span className="muted">{sel.length}/{count} {t('places selected')}{remaining !== null && sel.length > 0 ? ` · ${t('held')} ${mmss}` : ''}</span>
           </div>
           <button className="btn btn--primary" disabled={!ready} onClick={() => setStep('details')}>
             {ready ? t('Continue') : t('Select {n} more', { n: count - sel.length })}
@@ -414,7 +415,9 @@ export function Book() {
         </div>
       )}
 
-      {toast && <div className={`toast toast--${toast.kind}`} role="status">{toast.text}</div>}
+      <div className="status-line" role="status" aria-live="polite">
+        {toast && <div className={`toast toast--${toast.kind}`}>{toast.text}</div>}
+      </div>
     </div>
   );
 }

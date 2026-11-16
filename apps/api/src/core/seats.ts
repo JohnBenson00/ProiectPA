@@ -1,4 +1,4 @@
-import { all, get } from './db.js';
+import { all, get } from './sql.js';
 import { LAYOUTS, bookableCells, capacity, type Cell, type Layout } from './layouts.js';
 
 export const HOLD_MINUTES = 10;

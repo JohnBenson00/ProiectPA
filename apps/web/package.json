@@ -5,20 +5,25 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:pages": "tsc --noEmit && VITE_LOCAL_API=1 PAGES_BASE=${PAGES_BASE:-/ProiectPA/} vite build --outDir dist-pages --emptyOutDir && cp dist-pages/index.html dist-pages/404.html && touch dist-pages/.nojekyll",
+    "preview:pages": "vite preview --outDir dist-pages --port 4173 --base ${PAGES_BASE:-/ProiectPA/}"
   },
   "dependencies": {
+    "@noble/hashes": "^1.5.0",
     "html5-qrcode": "2.3.8",
     "lucide-react": "0.460.0",
     "qrcode": "1.5.4",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "6.28.0"
+    "react-router-dom": "6.28.0",
+    "sql.js": "^1.12.0"
   },
   "devDependencies": {
     "@types/qrcode": "1.5.5",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
+    "@types/sql.js": "^1.4.9",
     "@vitejs/plugin-react": "4.3.3",
     "typescript": "5.6.3",
     "vite": "5.4.11"
