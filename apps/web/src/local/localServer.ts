@@ -9,9 +9,10 @@ import { setDriver, initSchema, get } from '../../../api/src/core/sql';
 import { seed } from '../../../api/src/core/seed';
 import { handle } from '../../../api/src/core/routes';
 import { todayLocal, addDays } from '../../../api/src/core/util';
+import { extendSchedule } from '../../../api/src/core/schedule';
 
 const STORE = 'rasnov-trains';
-const KEY = 'db-v2';
+const KEY = 'db-v3'; // bump when the schema changes
 
 function idb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -81,6 +82,8 @@ async function init() {
   initSchema();
   if (!fresh || !get(`SELECT id FROM stations LIMIT 1`)) {
     seed(true);
+    persist(0);
+  } else if (extendSchedule(30) > 0) {
     persist(0);
   }
 }

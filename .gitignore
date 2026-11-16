@@ -4,3 +4,6 @@ dist
 *.db-*
 .env
 dist-pages
+apps/api/data
+deploy/data
+deploy/.env

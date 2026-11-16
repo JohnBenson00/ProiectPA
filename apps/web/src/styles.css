@@ -515,3 +515,4 @@ button.coach:hover { border-color: #7e8a99; }
   body, .page { background: #fff; }
 }
 @media (hover: none) { .seat-tip { display: none; } }
+.rules { grid-column: 1 / -1; }

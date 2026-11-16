@@ -12,6 +12,7 @@ import { all } from './core/sql.js';
 import { handle } from './core/routes.js';
 
 openDatabase(path.join(os.tmpdir(), `trains-test-${process.pid}.db`));
+// tests run against a throwaway demo database
 seed(true);
 
 test('auto-pick keeps a party of 4 together in one group', () => {
@@ -84,4 +85,33 @@ test('API: staff routes require the right role', () => {
   const login = handle('POST', '/api/auth/login', {}, { username: 'conductor', password: 'conductor123' }).body as any;
   assert.equal(handle('GET', '/api/admin/stats', {}, undefined, `Bearer ${login.token}`).status, 200);
   assert.equal(handle('POST', '/api/admin/trips', {}, {}, `Bearer ${login.token}`).status, 403);
+});
+
+test('rolling timetable: idempotent, and never re-creates a cancelled departure', async () => {
+  const { extendSchedule } = await import('./core/schedule.js');
+  const { run: exec } = await import('./core/sql.js');
+  const before = all(`SELECT id FROM trips`).length;
+  assert.equal(extendSchedule(30), 0, 'running again creates nothing');
+  const t = all<{ id: number }>(`SELECT id FROM trips WHERE route_id = 1 ORDER BY departure DESC LIMIT 1`)[0];
+  exec(`UPDATE trips SET status = 'CANCELLED' WHERE id = ?`, t.id);
+  assert.equal(extendSchedule(30), 0, 'the cancelled slot stays cancelled');
+  assert.ok(extendSchedule(40) > 0, 'a longer horizon adds new days');
+  assert.ok(all(`SELECT id FROM trips`).length > before);
+});
+
+test('staff accounts: create, role change and deletion take effect immediately', () => {
+  const admin = (handle('POST', '/api/auth/login', {}, { username: 'admin', password: 'admin123' }).body as any).token;
+  const A = `Bearer ${admin}`;
+  assert.equal(handle('POST', '/api/admin/users', {}, { username: 'maria', password: 'short', role: 'CONDUCTOR', name: 'Maria' }, A).status, 400);
+  const created = handle('POST', '/api/admin/users', {}, { username: 'maria', password: 'long-enough-1', role: 'CONDUCTOR', name: 'Maria' }, A);
+  assert.equal(created.status, 200);
+  const id = (created.body as any).id;
+  const m = `Bearer ${(handle('POST', '/api/auth/login', {}, { username: 'maria', password: 'long-enough-1' }).body as any).token}`;
+  assert.equal(handle('GET', '/api/admin/users', {}, undefined, m).status, 403);
+  assert.equal(handle('PATCH', `/api/admin/users/${id}`, {}, { role: 'ADMIN' }, A).status, 200);
+  assert.equal(handle('GET', '/api/admin/users', {}, undefined, m).status, 200, 'promotion applies to the existing session');
+  assert.equal(handle('DELETE', `/api/admin/users/${id}`, {}, undefined, A).status, 200);
+  assert.equal(handle('GET', '/api/admin/stats', {}, undefined, m).status, 401, 'deleted account is logged out');
+  const me = (handle('GET', '/api/admin/users', {}, undefined, A).body as any[]).find((u) => u.username === 'admin');
+  assert.equal(handle('DELETE', `/api/admin/users/${me.id}`, {}, undefined, A).status, 409, 'cannot delete yourself');
 });

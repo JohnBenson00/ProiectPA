@@ -24,6 +24,7 @@ export function Book() {
   const [sel, setSel] = useState<Sel[]>([]);
   const [prefs, setPrefs] = useState<string[]>([]);
   const [prefsOpen, setPrefsOpen] = useState(false);
+  const [emailOn, setEmailOn] = useState(false);
   const [active, setActive] = useState(1);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -46,7 +47,7 @@ export function Book() {
       setTrip(tr);
       setActive(tr.train.wagons.find((w) => w.bookable)?.number ?? 1);
     }).catch((e) => setError(e.message));
-    api('/api/meta').then((m) => setTypes(m.passengerTypes));
+    api('/api/meta').then((m) => { setTypes(m.passengerTypes); setEmailOn(!!m.emailEnabled); });
   }, [id]);
 
   // seat index: key -> {cell, wagon}
@@ -309,7 +310,9 @@ export function Book() {
           {step === 'details' && (
             <form className="panel form" onSubmit={(e) => { e.preventDefault(); if (detailsOk) setStep('pay'); }}>
               <h2 className="panel-title">{t('Contact details')}</h2>
-              <p className="muted small">{t('We send the tickets to this email. You can also find them later with the booking code.')}</p>
+              <p className="muted small">{emailOn
+                ? t('We send the tickets to this email. You can also find them later with the booking code.')
+                : t('With your booking code and this email you can open your tickets at any time.')}</p>
               <label>{t('Full name')}<input required autoComplete="name" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} /></label>
               <div className="form-row">
                 <label>{t('Email')}<input required type="email" autoComplete="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} /></label>

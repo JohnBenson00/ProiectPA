@@ -1,0 +1,56 @@
+# Râșnov Trains on a Raspberry Pi (or any Linux server).
+#   cp .env.example .env   # then edit it
+#   docker compose --profile caddy up -d --build    # option A: own HTTPS, ports 80/443 forwarded
+#   docker compose --profile tunnel up -d --build   # option B: Cloudflare Tunnel, no open ports
+#   docker compose up -d --build                    # option C: you already run nginx/Caddy
+# See docs/DEPLOY-RASPBERRY-PI.md
+name: rasnov-trains
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: rasnov-trains:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    # only reachable from the Pi itself; the proxy below (or your own) forwards to it
+    ports:
+      - "127.0.0.1:3001:3001"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  caddy:
+    profiles: ["caddy"]
+    image: caddy:2.8
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  tunnel:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on: [app]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+
+volumes:
+  caddy_data:
+  caddy_config:

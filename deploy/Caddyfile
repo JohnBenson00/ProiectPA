@@ -1,0 +1,5 @@
+# Automatic HTTPS (Let's Encrypt) for the domain in .env (DOMAIN=...)
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3001
+}

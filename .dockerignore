@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/dist-pages
+apps/api/data
+deploy/data
+deploy/.env
+*.db
+*.db-*
+.git
+docs

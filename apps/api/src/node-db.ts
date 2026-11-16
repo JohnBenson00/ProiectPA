@@ -1,15 +1,10 @@
 /** node:sqlite driver for the database facade. */
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { setDriver, initSchema } from './core/sql.js';
-import { setSecret } from './core/util.js';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-
-export function openDatabase(file = process.env.DB_PATH ?? path.join(here, '..', 'trains.db')) {
+export function openDatabase(file: string) {
   const db = new DatabaseSync(file);
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL;');
   const cache = new Map<string, StatementSync>();
   const st = (sql: string) => {
     let s = cache.get(sql);
@@ -25,7 +20,6 @@ export function openDatabase(file = process.env.DB_PATH ?? path.join(here, '..',
     },
     exec: (sql) => { cache.clear(); db.exec(sql); },
   });
-  if (process.env.TICKET_SECRET) setSecret(process.env.TICKET_SECRET);
   initSchema();
   return db;
 }

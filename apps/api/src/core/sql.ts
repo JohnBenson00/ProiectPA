@@ -79,6 +79,13 @@ CREATE INDEX IF NOT EXISTS tickets_trip ON tickets(trip_id);
 CREATE TABLE IF NOT EXISTS blocked (
   trip_id INTEGER NOT NULL, seat_key TEXT NOT NULL, reason TEXT DEFAULT '', PRIMARY KEY (trip_id, seat_key)
 );
+CREATE TABLE IF NOT EXISTS schedule_rules (
+  id INTEGER PRIMARY KEY, route_id INTEGER NOT NULL REFERENCES routes(id), train_id INTEGER NOT NULL REFERENCES trains(id),
+  days TEXT NOT NULL, times TEXT NOT NULL, valid_from TEXT NOT NULL, valid_to TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS generated_slots (
+  rule_id INTEGER NOT NULL, departure TEXT NOT NULL, PRIMARY KEY (rule_id, departure)
+);
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL, name TEXT NOT NULL
 );

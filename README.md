@@ -21,9 +21,25 @@ For development with hot reload: `npm run dev` (web on http://localhost:5173, AP
 |---|---|
 | `npm run build:pages -w apps/web` | Static build for GitHub Pages (no server needed, see below) |
 | `npm run seed` | Reset the database: 3 trains, 14 wagons, 5 routes, ~800 departures, demo bookings |
-| `npm test` | Unit tests for the algorithms (seat auto-pick, re-seating, ticket signatures) |
+| `npm test` | Tests: seat algorithms, ticket signatures, double booking, staff roles, rolling timetable |
+| `npm run cli -- user:list` | Maintenance commands (users, passwords, backup), see `apps/api/src/cli.ts` |
 
-Staff accounts: `admin / admin123` (everything) and `conductor / conductor123` (scanner + seat maps).
+Development/demo staff accounts: `admin / admin123` (everything) and `conductor / conductor123` (scanner + seat maps).
+These do **not** exist in production.
+
+## Production (Raspberry Pi / own server)
+
+`docker compose` in `deploy/` runs the real shared system with automatic HTTPS for your domain.
+Step-by-step guide: **[docs/DEPLOY-RASPBERRY-PI.md](docs/DEPLOY-RASPBERRY-PI.md)**.
+
+In production (`NODE_ENV=production`, the default in Docker):
+- no demo logins and no fake bookings; the first start creates `admin` with a random password (`data/initial-admin-password.txt`)
+- the timetable is made of **rules** (e.g. "IR 1741 daily 08:15, 12:15, 16:15"); departures are generated 60 days ahead and extended every hour
+- staff accounts are managed in the admin panel (*Staff accounts*); conductors only see scanner and seat maps
+- daily database backups in `data/backups/`, optional confirmation emails over SMTP
+- rate limiting, security headers, signed tickets with a secret generated on first start
+
+Settings are environment variables, see [deploy/.env.example](deploy/.env.example).
 
 ## Live demo (GitHub Pages)
 

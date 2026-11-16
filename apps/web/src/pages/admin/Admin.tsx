@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
-import { CalendarClock, LayoutDashboard, LogOut, ScanLine, TrainFront } from 'lucide-react';
+import { CalendarClock, LayoutDashboard, LogOut, ScanLine, TrainFront, UserCog } from 'lucide-react';
 import { api, getStaffToken } from '../../api';
 import { useT } from '../../i18n';
 import { Departures } from './Departures';
@@ -8,6 +8,7 @@ import { Occupancy } from './Occupancy';
 import { Scanner } from './Scanner';
 import { Schedule } from './Schedule';
 import { Fleet } from './Fleet';
+import { Accounts } from './Accounts';
 
 export interface StaffUser { id: number; role: 'ADMIN' | 'CONDUCTOR'; name: string }
 
@@ -20,6 +21,8 @@ function Login({ onDone }: { onDone: () => void }) {
   const [u, setU] = useState('');
   const [p, setP] = useState('');
   const [err, setErr] = useState('');
+  const [demo, setDemo] = useState(false);
+  useEffect(() => { api('/api/meta').then((m) => setDemo(!!m.demo)).catch(() => {}); }, []);
   return (
     <div className="page page--narrow">
       <form className="card form" onSubmit={async (e) => {
@@ -36,7 +39,7 @@ function Login({ onDone }: { onDone: () => void }) {
         <label>{t('Password')}<input type="password" autoComplete="current-password" value={p} onChange={(e) => setP(e.target.value)} required /></label>
         {err && <p className="error">{err}</p>}
         <button className="btn btn--primary">{t('Log in')}</button>
-        <p className="muted small">Demo: <code>admin / admin123</code> · <code>conductor / conductor123</code></p>
+        {demo && <p className="muted small">Demo: <code>admin / admin123</code> · <code>conductor / conductor123</code></p>}
       </form>
     </div>
   );
@@ -65,6 +68,7 @@ export function Admin() {
           {tab('/admin/scan', <ScanLine size={16} aria-hidden />, 'Scanner')}
           {isAdmin && tab('/admin/schedule', <CalendarClock size={16} aria-hidden />, 'Schedule')}
           {isAdmin && tab('/admin/fleet', <TrainFront size={16} aria-hidden />, 'Fleet')}
+          {tab('/admin/accounts', <UserCog size={16} aria-hidden />, isAdmin ? 'Staff accounts' : 'My account')}
         </nav>
         <span className="muted small">{user.name} ({t(user.role)})</span>
         <button className="btn btn--small" onClick={() => { localStorage.removeItem('staffToken'); localStorage.removeItem('staffUser'); nav('/admin'); force((x) => x + 1); }}>
@@ -77,6 +81,7 @@ export function Admin() {
         <Route path="scan" element={<Scanner />} />
         {isAdmin && <Route path="schedule" element={<Schedule />} />}
         {isAdmin && <Route path="fleet" element={<Fleet />} />}
+        <Route path="accounts" element={<Accounts me={user} />} />
         <Route path="*" element={<p>{t('Not found')} – <Link to="/admin">{t('Departures')}</Link></p>} />
       </Routes>
     </div>

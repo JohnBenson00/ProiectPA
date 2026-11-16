@@ -3,7 +3,9 @@
  * so the same handlers run in the Node server and, for the static demo, in the browser.
  */
 import { all, get, run, tx } from './sql.js';
-import { nowLocal, todayLocal, addDays, checkPassword, makeToken, readToken, bookingCode, PASSENGER_TYPES } from './util.js';
+import { nowLocal, todayLocal, addDays, checkPassword, hashPassword, makeToken, readToken, bookingCode, PASSENGER_TYPES } from './util.js';
+import { config, hooks } from './runtime.js';
+import { addRule, extendSchedule } from './schedule.js';
 import { LAYOUTS } from './layouts.js';
 import { HOLD_MINUTES, autoPick, availability, freeCount, planReseat, trainSeats, trainWagons, unavailableSet } from './seats.js';
 
@@ -42,8 +44,11 @@ export function handle(method: string, path: string, query: Record<string, strin
       if (r.roles) {
         const s = readToken<Staff>(String(authorization ?? '').replace(/^Bearer /, ''));
         if (!s || s.exp < Date.now()) throw new HttpError(401, 'Please log in');
-        if (!r.roles.includes(s.role)) throw new HttpError(403, 'Not allowed for your role');
-        req.staff = s;
+        // the account must still exist; its current role counts (not the one in the token)
+        const u = get<{ role: Role; name: string }>(`SELECT role, name FROM users WHERE id = ?`, s.id);
+        if (!u) throw new HttpError(401, 'Please log in');
+        if (!r.roles.includes(u.role)) throw new HttpError(403, 'Not allowed for your role');
+        req.staff = { ...s, role: u.role, name: u.name };
       }
       return { status: 200, body: r.fn(req) ?? {} };
     }
@@ -112,7 +117,11 @@ add('GET', '/api/meta', null, () => ({
   holdMinutes: HOLD_MINUTES,
   today: todayLocal(),
   now: nowLocal(),
+  demo: config.demo,
+  emailEnabled: config.emailEnabled,
 }));
+
+add('GET', '/api/health', null, () => ({ ok: true, time: nowLocal(), trips: get<{ c: number }>(`SELECT COUNT(*) c FROM trips`)!.c }));
 
 add('GET', '/api/calendar', null, (req) => {
   const routeId = Number(req.query.route) || 1;
@@ -196,10 +205,12 @@ add('POST', '/api/bookings', null, (req) => {
   const trip = getTrip(Number(tripId));
   if (!contact?.name?.trim() || !/^\S+@\S+\.\S+$/.test(contact?.email ?? '')) throw new HttpError(400, 'Name and a valid email are required');
   if (!Array.isArray(seats) || !seats.length) throw new HttpError(400, 'Select at least one seat');
+  if (seats.length > 12 || new Set(seats.map((x) => x.seatKey)).size !== seats.length) throw new HttpError(400, 'Invalid seat selection');
+  if (contact.name.length > 100 || contact.email.length > 200 || String(contact.phone ?? '').length > 40) throw new HttpError(400, 'Contact details are too long');
   if (trip.status !== 'SCHEDULED' || trip.departure < nowLocal()) throw new HttpError(409, 'This departure can no longer be booked');
   const route = get<Route>(`SELECT * FROM routes WHERE id = ?`, trip.route_id)!;
   const seatMap = new Map(trainSeats(trip.train_id).map((s) => [s.key, s]));
-  return tx(() => {
+  const result = tx(() => {
     const now = Date.now();
     const mine = new Set(all<{ seat_key: string }>(`SELECT seat_key FROM holds WHERE trip_id = ? AND session = ? AND expires_at > ?`, trip.id, session, now).map((r) => r.seat_key));
     const lost = seats.filter((s) => !mine.has(s.seatKey)).map((s) => s.seatKey);
@@ -218,9 +229,11 @@ add('POST', '/api/bookings', null, (req) => {
     run(`DELETE FROM holds WHERE trip_id = ? AND session = ?`, trip.id, session);
     return { code, email: contact.email.trim().toLowerCase(), total };
   });
+  hooks.bookingCreated?.(result.code);
+  return result;
 });
 
-const bookingOut = (code: string, email?: string, staff = false) => {
+export const bookingOut = (code: string, email?: string, staff = false) => {
   const b = get<any>(`SELECT * FROM bookings WHERE code = ?`, code.toUpperCase());
   if (!b || (!staff && b.email !== String(email ?? '').trim().toLowerCase())) throw new HttpError(404, 'Booking not found. Check the code and the email address.');
   const trip = getTrip(b.trip_id);
@@ -246,6 +259,7 @@ add('POST', '/api/bookings/:code/cancel', null, (req) => {
     run(`UPDATE bookings SET status = 'CANCELLED' WHERE code = ?`, b.code);
     run(`UPDATE tickets SET status = 'CANCELLED' WHERE booking_id = (SELECT id FROM bookings WHERE code = ?) AND status = 'VALID'`, b.code);
   });
+  hooks.bookingCancelled?.(b.code);
   return bookingOut(b.code, b.email);
 });
 
@@ -304,9 +318,17 @@ add('POST', '/api/admin/trips', ADMIN, (req) => {
 
 /** Generate trips from a recurring rule (days of week + times between two dates). Idempotent. */
 add('POST', '/api/admin/schedule', ADMIN, (req) => {
-  const { routeId, trainId, from, to, days, times } = req.body as { routeId: number; trainId: number; from: string; to: string; days: number[]; times: string[] };
-  if (!from || !to || to < from) throw new HttpError(400, 'Invalid date range');
+  const { routeId, trainId, from, to, days, times, repeat } = req.body as { routeId: number; trainId: number; from: string; to: string; days: number[]; times: string[]; repeat?: boolean };
   if (!times?.length || times.some((t) => !/^\d{2}:\d{2}$/.test(t))) throw new HttpError(400, 'Times must be HH:MM');
+  if (!Array.isArray(days) || !days.length) throw new HttpError(400, 'Choose at least one weekday');
+  if (!get(`SELECT id FROM routes WHERE id = ?`, routeId) || !get(`SELECT id FROM trains WHERE id = ?`, trainId)) throw new HttpError(400, 'Unknown route or train');
+  if (repeat) {
+    // a timetable rule: departures keep being generated automatically (until `to`, if given)
+    if (!from || (to && to < from)) throw new HttpError(400, 'Invalid date range');
+    const ruleId = addRule(Number(routeId), Number(trainId), days, [...new Set(times)].sort(), from, to || null);
+    return { created: extendSchedule(config.scheduleDays, from), skipped: 0, ruleId };
+  }
+  if (!from || !to || to < from) throw new HttpError(400, 'Invalid date range');
   let created = 0, skipped = 0;
   tx(() => {
     for (let d = from; d <= to; d = addDays(d, 1)) {
@@ -321,6 +343,76 @@ add('POST', '/api/admin/schedule', ADMIN, (req) => {
     }
   });
   return { created, skipped };
+});
+
+add('GET', '/api/admin/rules', STAFF, () => all<any>(
+  `SELECT s.*, r.code AS route_code, r.name AS route_name, t.name AS train_name FROM schedule_rules s
+   JOIN routes r ON r.id = s.route_id JOIN trains t ON t.id = s.train_id ORDER BY s.route_id, s.id`,
+).map((x) => ({ ...x, days: JSON.parse(x.days), times: JSON.parse(x.times), active: !x.valid_to || x.valid_to >= todayLocal() })));
+
+/** Stop a timetable rule: no new departures are generated; existing ones stay. */
+add('DELETE', '/api/admin/rules/:id', ADMIN, (req) => {
+  const r = run(`UPDATE schedule_rules SET valid_to = ? WHERE id = ?`, todayLocal(), Number(req.params.id));
+  if (!r.changes) throw new HttpError(404, 'Rule not found');
+  return { ok: true };
+});
+
+// ---------- staff accounts ----------
+const ROLES: Role[] = ['ADMIN', 'CONDUCTOR'];
+const checkNewPassword = (pw: unknown) => {
+  if (typeof pw !== 'string' || pw.length < 8) throw new HttpError(400, 'The password must have at least 8 characters');
+};
+const adminCount = () => get<{ c: number }>(`SELECT COUNT(*) c FROM users WHERE role = 'ADMIN'`)!.c;
+
+add('GET', '/api/admin/users', ADMIN, () => all(`SELECT id, username, role, name FROM users ORDER BY role, username`));
+
+add('POST', '/api/admin/users', ADMIN, (req) => {
+  const { username, password, role, name } = req.body ?? {};
+  if (typeof username !== 'string' || !/^[a-z0-9._-]{3,32}$/.test(username)) throw new HttpError(400, 'Username: 3-32 lowercase letters, digits, dot, dash or underscore');
+  if (!ROLES.includes(role)) throw new HttpError(400, 'Unknown role');
+  if (typeof name !== 'string' || !name.trim() || name.length > 80) throw new HttpError(400, 'Name is required');
+  checkNewPassword(password);
+  if (get(`SELECT id FROM users WHERE username = ?`, username)) throw new HttpError(409, 'This username already exists');
+  const r = run(`INSERT INTO users (username, password_hash, role, name) VALUES (?,?,?,?)`, username, hashPassword(password), role, name.trim());
+  return { id: r.lastInsertRowid };
+});
+
+add('PATCH', '/api/admin/users/:id', ADMIN, (req) => {
+  const id = Number(req.params.id);
+  const u = get<{ role: Role }>(`SELECT role FROM users WHERE id = ?`, id);
+  if (!u) throw new HttpError(404, 'User not found');
+  const { name, role, password } = req.body ?? {};
+  if (role !== undefined) {
+    if (!ROLES.includes(role)) throw new HttpError(400, 'Unknown role');
+    if (u.role === 'ADMIN' && role !== 'ADMIN' && adminCount() === 1) throw new HttpError(409, 'There must be at least one administrator');
+    run(`UPDATE users SET role = ? WHERE id = ?`, role, id);
+  }
+  if (name !== undefined) {
+    if (typeof name !== 'string' || !name.trim() || name.length > 80) throw new HttpError(400, 'Name is required');
+    run(`UPDATE users SET name = ? WHERE id = ?`, name.trim(), id);
+  }
+  if (password !== undefined) { checkNewPassword(password); run(`UPDATE users SET password_hash = ? WHERE id = ?`, hashPassword(password), id); }
+  return { ok: true };
+});
+
+add('DELETE', '/api/admin/users/:id', ADMIN, (req) => {
+  const id = Number(req.params.id);
+  if (id === req.staff!.id) throw new HttpError(409, 'You cannot delete your own account');
+  const u = get<{ role: Role }>(`SELECT role FROM users WHERE id = ?`, id);
+  if (!u) throw new HttpError(404, 'User not found');
+  if (u.role === 'ADMIN' && adminCount() === 1) throw new HttpError(409, 'There must be at least one administrator');
+  run(`DELETE FROM users WHERE id = ?`, id);
+  return { ok: true };
+});
+
+/** Any staff member: change your own password. */
+add('POST', '/api/admin/me/password', STAFF, (req) => {
+  const { current, next } = req.body ?? {};
+  const u = get<{ password_hash: string }>(`SELECT password_hash FROM users WHERE id = ?`, req.staff!.id)!;
+  if (!checkPassword(String(current ?? ''), u.password_hash)) throw new HttpError(400, 'The current password is wrong');
+  checkNewPassword(next);
+  run(`UPDATE users SET password_hash = ? WHERE id = ?`, hashPassword(next), req.staff!.id);
+  return { ok: true };
 });
 
 add('GET', '/api/admin/trips/:id/reseat-preview', ADMIN, (req) => planReseat(Number(req.params.id), Number(req.query.trainId)));

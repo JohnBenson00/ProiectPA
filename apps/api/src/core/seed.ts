@@ -2,8 +2,19 @@ import { SCHEMA, exec, tx, run, get, all } from './sql.js';
 import { hashPassword, todayLocal, addDays, bookingCode, PASSENGER_TYPES } from './util.js';
 import { LAYOUTS } from './layouts.js';
 import { trainSeats } from './seats.js';
+import { addRule, extendSchedule } from './schedule.js';
 
-export function seed(reset = false) {
+export interface SeedOptions {
+  /** demo accounts admin/admin123 and conductor/conductor123 */
+  demoUsers?: boolean;
+  /** fake bookings so seat maps look busy */
+  demoBookings?: boolean;
+  /** days of departures to generate */
+  days?: number;
+}
+
+export function seed(reset = false, opts: SeedOptions = {}) {
+  const { demoUsers = true, demoBookings = true, days = 30 } = opts;
   if (reset) {
     exec(`DROP TABLE IF EXISTS tickets; DROP TABLE IF EXISTS bookings; DROP TABLE IF EXISTS holds; DROP TABLE IF EXISTS blocked;
       DROP TABLE IF EXISTS trips; DROP TABLE IF EXISTS train_wagons; DROP TABLE IF EXISTS wagons; DROP TABLE IF EXISTS trains;
@@ -44,10 +55,12 @@ export function seed(reset = false) {
       });
     });
 
-    run(`INSERT INTO users (username, password_hash, role, name) VALUES (?,?,?,?)`, 'admin', hashPassword('admin123'), 'ADMIN', 'Administrator');
-    run(`INSERT INTO users (username, password_hash, role, name) VALUES (?,?,?,?)`, 'conductor', hashPassword('conductor123'), 'CONDUCTOR', 'Ion Conductor');
+    if (demoUsers) {
+      run(`INSERT INTO users (username, password_hash, role, name) VALUES (?,?,?,?)`, 'admin', hashPassword('admin123'), 'ADMIN', 'Administrator');
+      run(`INSERT INTO users (username, password_hash, role, name) VALUES (?,?,?,?)`, 'conductor', hashPassword('conductor123'), 'CONDUCTOR', 'Ion Conductor');
+    }
 
-    // trips: yesterday .. +30 days
+    // timetable: recurring rules, expanded into departures below
     const today = todayLocal();
     const schedule: Array<[number, number, string[]]> = [
       [1, 1, ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00']],
@@ -56,12 +69,10 @@ export function seed(reset = false) {
       [4, 2, ['10:20', '14:20', '18:20']],
       [5, 3, ['22:10']],
     ];
-    for (let d = -1; d <= 30; d++) {
-      const date = addDays(today, d);
-      for (const [routeId, trainId, times] of schedule)
-        for (const t of times) run(`INSERT INTO trips (route_id, train_id, departure) VALUES (?,?,?)`, routeId, trainId, `${date}T${t}`);
-    }
+    for (const [routeId, trainId, times] of schedule) addRule(routeId, trainId, [0, 1, 2, 3, 4, 5, 6], times, addDays(today, -1), null);
   });
+  extendSchedule(days, addDays(todayLocal(), -1));
+  if (!demoBookings) return true;
 
   // demo bookings so the seat maps look realistic (deterministic pseudo-random)
   let s = 42;
