@@ -30,7 +30,10 @@ export function sessionId(): string {
 }
 
 export const fmtTime = (iso: string) => iso.slice(11, 16);
-export const fmtMoney = (n: number) => `${n.toFixed(n % 1 ? 2 : 0)} lei`;
+export function fmtMoney(n: number) {
+  const en = typeof document !== 'undefined' && document.documentElement.lang === 'en';
+  return `${new Intl.NumberFormat(en ? 'en-GB' : 'ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} lei`;
+}
 export function fmtDate(date: string, lang: string, opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }) {
   return new Date(date.slice(0, 10) + 'T12:00:00').toLocaleDateString(lang === 'ro' ? 'ro-RO' : 'en-GB', opts);
 }

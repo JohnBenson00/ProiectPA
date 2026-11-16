@@ -1,6 +1,5 @@
 import { lazy, Suspense } from 'react';
 import { NavLink, Route, Routes, Link } from 'react-router-dom';
-import { Ticket, TrainFront, Shield } from 'lucide-react';
 import { Home } from './pages/Home';
 import { Book } from './pages/Book';
 import { TicketPage, ManageBooking } from './pages/Ticket';
@@ -17,14 +16,14 @@ export function App() {
       <a href="#main" className="skip">{t('Skip to content')}</a>
       <header className="topbar no-print">
         <Link to="/" className="brand" aria-label="Râșnov Trains">
-          <img src="/favicon.svg" width={28} height={28} alt="" />
+          <img src="/favicon.svg" width={24} height={24} alt="" />
           <span>Râșnov <b>Trains</b></span>
         </Link>
         <nav className="topnav" aria-label={t('Main')}>
           <NavLink to="/" end>{t('Departures')}</NavLink>
-          <NavLink to="/trains"><TrainFront size={15} aria-hidden /> {t('Trains')}</NavLink>
-          <NavLink to="/booking"><Ticket size={15} aria-hidden /> {t('My tickets')}</NavLink>
-          <NavLink to="/admin"><Shield size={15} aria-hidden /> {t('Staff')}</NavLink>
+          <NavLink to="/trains">{t('Trains')}</NavLink>
+          <NavLink to="/booking">{t('My tickets')}</NavLink>
+          <NavLink to="/admin">{t('Staff')}</NavLink>
         </nav>
         <div className="lang" role="group" aria-label={t('Language')}>
           {(['ro', 'en'] as const).map((l) => (

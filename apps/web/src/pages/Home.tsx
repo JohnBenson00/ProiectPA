@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Clock, Sparkles, Ticket } from 'lucide-react';
 import { api, fmtDate, fmtDuration, fmtMoney, fmtTime } from '../api';
 import type { Route, TripSummary } from '../types';
 import { TrainStrip } from '../components/TrainStrip';
@@ -39,18 +38,6 @@ export function Home() {
           <h1>{t('Tickets for the Râșnov trains')}</h1>
           <p>{t('Choose your departure, pick your exact seat on the train map and board with the QR code on your phone. No queue at the ticket office.')}</p>
         </div>
-        <div className="hero-art" aria-hidden>
-          <svg viewBox="0 0 220 120">
-            <path d="M0 105 L60 55 L95 80 L140 30 L220 100 L220 120 L0 120Z" fill="#334155" opacity=".55" />
-            <path d="M110 48 h40 v-12 h6 v-8 h6 v8 h6 v-8 h6 v8 h6 v12 h-70Z" fill="#fbbf24" />
-            <rect x="122" y="22" width="10" height="16" fill="#fbbf24" />
-            <rect x="18" y="92" width="34" height="16" rx="4" fill="#fbbf24" />
-            <rect x="56" y="92" width="38" height="16" rx="3" fill="#fff" />
-            <rect x="98" y="92" width="38" height="16" rx="3" fill="#fff" />
-            <circle cx="28" cy="110" r="4" fill="#0f172a" /><circle cx="66" cy="110" r="4" fill="#0f172a" /><circle cx="86" cy="110" r="4" fill="#0f172a" />
-            <circle cx="108" cy="110" r="4" fill="#0f172a" /><circle cx="128" cy="110" r="4" fill="#0f172a" />
-          </svg>
-        </div>
       </section>
 
       <section aria-labelledby="routes-h">
@@ -60,7 +47,7 @@ export function Home() {
             <button key={r.id} role="tab" aria-selected={r.id === routeId} className={`route-tab${r.id === routeId ? ' is-active' : ''}`} onClick={() => set('route', String(r.id))}>
               <span className="route-code">{r.code}</span>
               <span className="route-name">{r.name}</span>
-              <span className="route-meta"><Clock size={12} aria-hidden /> {fmtDuration(r.duration_min)}</span>
+              <span className="route-meta">{fmtDuration(r.duration_min)}</span>
             </button>
           ))}
         </div>
@@ -104,10 +91,10 @@ export function Home() {
                     <span className="train-dot" style={{ background: tr.train.color }} />
                     <Link to={`/trains/${tr.train.id}`}>{tr.train.name}</Link>
                     <span className="muted small">{t(tr.train.kind)}</span>
-                    {tr.leastCrowded && <span className="badge badge--green"><Sparkles size={12} aria-hidden /> {t('Least crowded')}</span>}
+                    {tr.leastCrowded && <span className="badge badge--green">{t('Least crowded')}</span>}
                   </div>
                   <TrainStrip compact color={tr.train.color} wagons={tr.wagons} />
-                  <AmenityList codes={amen} size={14} max={9} />
+                  <AmenityList codes={amen} size={14} max={10} />
                 </div>
                 <div className="trip-buy">
                   {tr.status === 'CANCELLED' ? <span className="badge badge--red">{t('Cancelled')}</span>
@@ -115,7 +102,7 @@ export function Home() {
                       : <span className={`seats-left${tr.free < 20 ? ' is-low' : ''}`}>{tr.free === 0 ? t('Sold out') : `${tr.free} ${t('seats left')}`}</span>}
                   <span className="muted small">{t('from')} <b>{fmtMoney(tr.priceFrom)}</b></span>
                   <button className="btn btn--primary" disabled={disabled} onClick={() => nav(`/book/${tr.id}`)}>
-                    <Ticket size={16} aria-hidden /> {t('Choose seats')}
+                    {t('Choose seats')}
                   </button>
                 </div>
               </article>

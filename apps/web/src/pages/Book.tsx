@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { BedDouble, CreditCard, Info, Minus, Plus, Sparkles, Timer, Trash2, Wand2 } from 'lucide-react';
+import { Clock, Info, Minus, Plus, X } from 'lucide-react';
 import { api, ApiError, fmtDate, fmtDuration, fmtMoney, fmtTime, sessionId } from '../api';
 import type { Availability, Cell, PassengerType, SeatState, TripDetail, Wagon } from '../types';
 import { TrainMap } from '../components/TrainMap';
@@ -23,6 +23,7 @@ export function Book() {
   const [count, setCount] = useState(2);
   const [sel, setSel] = useState<Sel[]>([]);
   const [prefs, setPrefs] = useState<string[]>([]);
+  const [prefsOpen, setPrefsOpen] = useState(false);
   const [active, setActive] = useState(1);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -168,7 +169,7 @@ export function Book() {
       const r = await api<{ seatKeys: string[]; reasons: string[]; wagonNumber: number }>(`/api/trips/${id}/auto-pick`, { method: 'POST', body: { count, prefs, session } });
       setSel(r.seatKeys.map((k, i) => ({ key: k, type: sel[i]?.type ?? 'ADULT' })));
       setActive(r.wagonNumber);
-      const why = r.reasons.map((x) => t(SEAT_ATTRS[x] ?? x)).join(', ');
+      const why = r.reasons.map((x) => t(SEAT_ATTRS[x] ?? `pick_${x}`)).join(', ');
       say(`${t('We found {n} seats in wagon {w}', { n: count, w: r.wagonNumber })}${why ? ` – ${why}` : ''}.`);
     } catch (e) {
       say(t((e as Error).message), 'warn');
@@ -203,62 +204,85 @@ export function Book() {
 
   const describe = (c: Cell, k: string, w: Wagon) => {
     const st = stateOf(k);
+    const attrs = (c.attrs ?? []).filter((a) => SEAT_ATTRS[a]).map((a) => t(SEAT_ATTRS[a]));
     return (
       <>
-        <strong>{t(c.type === 'BERTH' ? 'Berth' : c.type === 'WHEELCHAIR' ? 'Wheelchair space' : 'Seat')} {c.label}</strong>
-        <span>{t('Wagon')} {w.number}{w.classLabel ? ` · ${t('class')} ${w.classLabel}` : ''}</span>
-        <span className="tip-attrs">{(c.attrs ?? []).filter((a) => SEAT_ATTRS[a]).map((a) => t(SEAT_ATTRS[a])).join(' · ')}</span>
-        {st === 'free' || st === 'selected' ? <span>{fmtMoney(trip.prices[w.layout]?.ADULT ?? 0)} ({t('Adult')})</span> : <span className="tip-state">{t(`seat_${st}`)}</span>}
+        <span className="tip-title">{t(c.type === 'BERTH' ? 'Berth' : c.type === 'WHEELCHAIR' ? 'Wheelchair space' : 'Seat')} {c.label} · {t('Wagon')} {w.number}</span>
+        {attrs.length > 0 && <span className="tip-attrs">{attrs.join(', ')}</span>}
+        {st === 'free' || st === 'selected'
+          ? <span className="tip-price">{fmtMoney(trip.prices[w.layout]?.ADULT ?? 0)} <span className="muted">/ {t('Adult').toLowerCase()}</span></span>
+          : <span className="tip-state">{t(`seat_${st}`)}</span>}
       </>
     );
   };
 
-  return (
-    <div className="page page--wide">
-      <header className="book-head">
-        <div>
-          <Link to={`/?route=${trip.route.id}&date=${trip.departure.slice(0, 10)}`} className="muted small">← {t('All departures')}</Link>
-          <h1>{trip.route.name}</h1>
-          <p className="muted">
-            {fmtDate(trip.departure, lang, { weekday: 'long', day: 'numeric', month: 'long' })} · <b>{fmtTime(trip.departure)}</b> → {fmtTime(trip.arrival)} ({fmtDuration(trip.route.duration_min)}) ·{' '}
-            <Link to={`/trains/${trip.train.id}`}>{trip.train.name}</Link> <span className="small">({t(trip.train.kind)})</span>
-          </p>
-        </div>
-        <ol className="steps" aria-label={t('Steps')}>
-          {(['seats', 'details', 'pay'] as const).map((s, i) => (
-            <li key={s} className={step === s ? 'is-active' : ''} aria-current={step === s ? 'step' : undefined}>{i + 1}. {t(`step_${s}`)}</li>
-          ))}
-          <li>4. {t('step_ticket')}</li>
-        </ol>
-      </header>
+  const stops = trip.route.stops;
+  const from = stops[0]?.name ?? trip.route.name;
+  const to = stops[stops.length - 1]?.name ?? '';
+  const between = Math.max(0, stops.length - 2);
+  const mmss = remaining !== null ? `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}` : '';
+  const stepIndex = { seats: 0, details: 1, pay: 2 }[step];
 
-      <div className="book-grid">
-        <main className="book-main">
+  return (
+    <div className="booking">
+      <div className="journey">
+        <div className="journey-inner">
+          <div className="journey-main">
+            <Link to={`/?route=${trip.route.id}&date=${trip.departure.slice(0, 10)}`} className="back-link">← {t('All departures')}</Link>
+            <p className="journey-route">
+              <span className="j-time">{fmtTime(trip.departure)}</span> {from}
+              <span className="j-arrow" aria-hidden>→</span>
+              <span className="j-time">{fmtTime(trip.arrival)}</span> {to}
+            </p>
+            <p className="journey-meta">
+              {fmtDate(trip.departure, lang, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              <span className="sep">·</span>{trip.route.code} <Link to={`/trains/${trip.train.id}`}>{trip.train.name}</Link>
+              <span className="sep">·</span>{fmtDuration(trip.route.duration_min)}
+              <span className="sep">·</span>{between ? t('{n} intermediate stops', { n: between }) : t('direct')}
+            </p>
+          </div>
+          <ol className="steps" aria-label={t('Steps')}>
+            {(['seats', 'details', 'pay', 'ticket'] as const).map((s, i) => (
+              <li key={s} className={i === stepIndex ? 'is-active' : i < stepIndex ? 'is-done' : ''} aria-current={i === stepIndex ? 'step' : undefined}>
+                <span className="step-no">{i + 1}</span>{t(`step_${s}`)}
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+
+      <div className="booking-grid">
+        <main className="booking-main">
           {step === 'seats' && (
-            <>
-              <div className="controls card">
-                <div className="control">
-                  <span className="control-label">{t('Passengers')}</span>
-                  <div className="stepper">
-                    <button className="icon-btn" onClick={() => changeCount(count - 1)} aria-label={t('Fewer passengers')}><Minus size={16} /></button>
+            <div className="panel">
+              <div className="seat-toolbar">
+                <div className="tb-group">
+                  <span className="tb-label" id="pax-label">{t('Passengers')}</span>
+                  <div className="stepper" role="group" aria-labelledby="pax-label">
+                    <button onClick={() => changeCount(count - 1)} disabled={count <= 1} aria-label={t('Fewer passengers')}><Minus size={14} /></button>
                     <output aria-live="polite">{count}</output>
-                    <button className="icon-btn" onClick={() => changeCount(count + 1)} aria-label={t('More passengers')}><Plus size={16} /></button>
+                    <button onClick={() => changeCount(count + 1)} disabled={count >= 12} aria-label={t('More passengers')}><Plus size={14} /></button>
                   </div>
                 </div>
-                <div className="control control--grow">
-                  <span className="control-label">{t('My preferences')} <span className="muted small">({t('other seats are dimmed')})</span></span>
-                  <div className="chips">
+                <fieldset className="tb-group tb-group--grow">
+                  <legend className="tb-label tb-label--desktop">{t('Seat preferences')}</legend>
+                  <button type="button" className="prefs-toggle" aria-expanded={prefsOpen} onClick={() => setPrefsOpen((o) => !o)}>
+                    {t('Seat preferences')}{prefs.length > 0 && ` (${prefs.length})`} <span aria-hidden>{prefsOpen ? '▴' : '▾'}</span>
+                  </button>
+                  <div className={`checks${prefsOpen ? ' is-open' : ''}`}>
                     {availablePrefs.map((p) => (
-                      <button key={p} className={`chip${prefs.includes(p) ? ' is-on' : ''}`} aria-pressed={prefs.includes(p)}
-                        onClick={() => setPrefs((x) => (x.includes(p) ? x.filter((y) => y !== p) : [...x, p]))}>
+                      <label key={p} className="check-inline">
+                        <input type="checkbox" checked={prefs.includes(p)}
+                          onChange={() => setPrefs((x) => (x.includes(p) ? x.filter((y) => y !== p) : [...x, p]))} />
                         {t(SEAT_ATTRS[p])}
-                      </button>
+                      </label>
                     ))}
                   </div>
+                </fieldset>
+                <div className="tb-group tb-group--end">
+                  <button className="btn" onClick={autoPick} disabled={busy}>{t('Auto-assign seats')}</button>
+                  <span className="tb-hint">{prefs.length ? t('Uses your preferences') : t('Keeps your group together')}</span>
                 </div>
-                <button className="btn btn--accent" onClick={autoPick} disabled={busy}>
-                  <Wand2 size={16} aria-hidden /> {t('Pick the best seats for me')}
-                </button>
               </div>
 
               <TrainMap
@@ -270,23 +294,28 @@ export function Book() {
                 dimmed={prefs.length ? (c, w) => !matches(c, w) : undefined}
                 describe={describe}
                 stats={stats}
-                legend={['free', 'selected', 'held', 'sold', 'blocked']}
+                legend={['free', 'selected', 'sold', 'held', 'blocked']}
                 wagonExtra={(w) => w.bookable && (
-                  <div className="price-row">
-                    {types.map((pt) => <span key={pt.code}>{t(pt.label)}: <b>{fmtMoney(trip.prices[w.layout]?.[pt.code] ?? 0)}</b></span>)}
-                  </div>
+                  <>
+                    <dt>{t('Fares')}</dt>
+                    <dd className="fares">
+                      {types.map((pt) => <span key={pt.code}>{t(pt.label)} <b>{fmtMoney(trip.prices[w.layout]?.[pt.code] ?? 0)}</b></span>)}
+                    </dd>
+                  </>
                 )}
               />
-            </>
+            </div>
           )}
 
           {step === 'details' && (
-            <form className="card form" onSubmit={(e) => { e.preventDefault(); if (detailsOk) setStep('pay'); }}>
-              <h2>{t('Contact details')}</h2>
+            <form className="panel form" onSubmit={(e) => { e.preventDefault(); if (detailsOk) setStep('pay'); }}>
+              <h2 className="panel-title">{t('Contact details')}</h2>
               <p className="muted small">{t('We send the tickets to this email. You can also find them later with the booking code.')}</p>
               <label>{t('Full name')}<input required autoComplete="name" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} /></label>
-              <label>{t('Email')}<input required type="email" autoComplete="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} /></label>
-              <label>{t('Phone (optional)')}<input type="tel" autoComplete="tel" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} /></label>
+              <div className="form-row">
+                <label>{t('Email')}<input required type="email" autoComplete="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} /></label>
+                <label>{t('Phone (optional)')}<input type="tel" autoComplete="tel" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} /></label>
+              </div>
               <label className="check"><input type="checkbox" required /> {t('I agree to the terms and to the processing of my data for this booking (GDPR).')}</label>
               <div className="form-actions">
                 <button type="button" className="btn" onClick={() => setStep('seats')}>{t('Back')}</button>
@@ -296,13 +325,13 @@ export function Book() {
           )}
 
           {step === 'pay' && (
-            <form className="card form" onSubmit={(e) => { e.preventDefault(); pay(); }}>
-              <h2><CreditCard size={20} aria-hidden /> {t('Payment')}</h2>
-              <p className="demo-note"><Info size={16} aria-hidden /> {t('Demo mode: no real payment is made. Any card number works.')}</p>
-              <label>{t('Card number')}<input inputMode="numeric" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value })} /></label>
+            <form className="panel form" onSubmit={(e) => { e.preventDefault(); pay(); }}>
+              <h2 className="panel-title">{t('Payment')}</h2>
+              <p className="notice"><Info size={15} aria-hidden /> {t('Demo mode: no real payment is made. Any card number works.')}</p>
+              <label>{t('Card number')}<input inputMode="numeric" autoComplete="cc-number" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value })} /></label>
               <div className="form-row">
-                <label>{t('Expiry')}<input value={card.exp} onChange={(e) => setCard({ ...card, exp: e.target.value })} /></label>
-                <label>CVC<input inputMode="numeric" value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value })} /></label>
+                <label>{t('Expiry')}<input autoComplete="cc-exp" value={card.exp} onChange={(e) => setCard({ ...card, exp: e.target.value })} /></label>
+                <label>CVC<input inputMode="numeric" autoComplete="cc-csc" value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value })} /></label>
               </div>
               <div className="form-actions">
                 <button type="button" className="btn" onClick={() => setStep('details')}>{t('Back')}</button>
@@ -312,55 +341,78 @@ export function Book() {
           )}
         </main>
 
-        <aside className="book-aside card" aria-label={t('Your selection')}>
-          <h2>{t('Your selection')}</h2>
-          <p className="muted small">{sel.length}/{count} {t('places selected')}</p>
+        <aside className="summary" aria-label={t('Your reservation')}>
+          <div className="summary-head">
+            <h2>{t('Your reservation')}</h2>
+            <span className="muted">{sel.length}/{count} {t('places selected')}</span>
+          </div>
           {remaining !== null && sel.length > 0 && (
-            <p className={`timer${remaining < 120 ? ' is-low' : ''}`} role="timer" aria-live="off">
-              <Timer size={16} aria-hidden /> {t('Seats held for')} {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
+            <p className={`hold${remaining < 120 ? ' is-low' : ''}`} role="timer" aria-live="off">
+              <Clock size={13} aria-hidden /> {t('Seats held for')} <span className="tabular">{mmss}</span>
             </p>
           )}
-          {sel.length === 0 && <p className="empty small">{t('Click free seats on the map, or let us pick the best ones.')}</p>}
-          <ul className="sel-list">
-            {sel.map((s, i) => {
-              const info = index.get(s.key);
-              if (!info) return null;
-              const compKind = info.wagon.kind === 'SLEEPER' || info.wagon.kind === 'COUCHETTE';
-              return (
-                <li key={s.key}>
-                  <button className="sel-seat" onClick={() => setActive(info.wagon.number)} title={t('Show on map')}>
-                    <span className="sel-num">{info.cell.label}</span>
-                    <span>
-                      <b>{t('Wagon')} {info.wagon.number}</b>
-                      <span className="small muted">{(info.cell.attrs ?? []).filter((a) => SEAT_ATTRS[a]).slice(0, 3).map((a) => t(SEAT_ATTRS[a])).join(' · ')}</span>
-                    </span>
-                  </button>
-                  <div className="sel-row">
-                    <select aria-label={t('Passenger type for seat {s}', { s: info.cell.label! })} value={s.type} disabled={step !== 'seats'}
-                      onChange={(e) => setSel((p) => p.map((x, j) => (j === i ? { ...x, type: e.target.value } : x)))}>
-                      {types.map((pt) => <option key={pt.code} value={pt.code}>{t(pt.label)}</option>)}
-                    </select>
-                    <span className="sel-price">{fmtMoney(priceOf(s.key, s.type))}</span>
-                    {step === 'seats' && (
-                      <button className="icon-btn" onClick={() => setSel((p) => p.filter((x) => x.key !== s.key))} aria-label={t('Remove seat {s}', { s: info.cell.label! })}><Trash2 size={15} /></button>
+          {sel.length === 0 ? (
+            <p className="summary-empty">{t('Select seats on the plan or use automatic assignment.')}</p>
+          ) : (
+            <ul className="sel-list">
+              {sel.map((s, i) => {
+                const info = index.get(s.key);
+                if (!info) return null;
+                const sameComp = (k: string) => { const o = index.get(k); return !!o && o.wagon.id === info.wagon.id && o.cell.group === info.cell.group; };
+                const firstOfComp = sel.findIndex((x) => sameComp(x.key)) === i;
+                const compHasFree = [...index.keys()].some((k) => sameComp(k) && stateOf(k) === 'free');
+                const compKind = (info.wagon.kind === 'SLEEPER' || info.wagon.kind === 'COUCHETTE') && firstOfComp && compHasFree;
+                const attrs = (info.cell.attrs ?? []).filter((a) => SEAT_ATTRS[a] && a !== 'COMPARTMENT').slice(0, 2).map((a) => t(SEAT_ATTRS[a])).join(', ');
+                return (
+                  <li key={s.key}>
+                    <div className="sel-top">
+                      <button className="sel-place" onClick={() => setActive(info.wagon.number)} title={t('Show on map')}>
+                        {t('Wagon')} {info.wagon.number}, {t(info.cell.type === 'BERTH' ? 'Berth' : 'Seat').toLowerCase()} {info.cell.label}
+                      </button>
+                      <span className="sel-price tabular">{fmtMoney(priceOf(s.key, s.type))}</span>
+                      {step === 'seats' && (
+                        <button className="sel-remove" onClick={() => setSel((p) => p.filter((x) => x.key !== s.key))} aria-label={t('Remove seat {s}', { s: info.cell.label! })}><X size={14} /></button>
+                      )}
+                    </div>
+                    <div className="sel-sub">
+                      <select aria-label={t('Passenger type for seat {s}', { s: info.cell.label! })} value={s.type} disabled={step !== 'seats'}
+                        onChange={(e) => setSel((p) => p.map((x, j) => (j === i ? { ...x, type: e.target.value } : x)))}>
+                        {types.map((pt) => <option key={pt.code} value={pt.code}>{t(pt.label)}</option>)}
+                      </select>
+                      {attrs && <span className="sel-attrs">{attrs}</span>}
+                    </div>
+                    {compKind && step === 'seats' && (
+                      <button className="link-btn" onClick={() => wholeCompartment(s.key)}>{t('Book the whole compartment')}</button>
                     )}
-                  </div>
-                  {compKind && step === 'seats' && (
-                    <button className="link-btn small" onClick={() => wholeCompartment(s.key)}><BedDouble size={14} aria-hidden /> {t('Book the whole compartment')}</button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          <div className="total"><span>{t('Total')}</span><b>{fmtMoney(total)}</b></div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="summary-total">
+            <span>{t('Total')}{sel.length > 0 && <span className="muted"> · {sel.length} {t(sel.length === 1 ? 'passenger' : 'passengers')}</span>}</span>
+            <b className="tabular">{fmtMoney(total)}</b>
+          </div>
           {step === 'seats' && (
             <button className="btn btn--primary btn--block" disabled={!ready} onClick={() => setStep('details')}>
               {ready ? t('Continue') : t('Select {n} more', { n: count - sel.length })}
             </button>
           )}
-          <p className="muted small"><Sparkles size={12} aria-hidden /> {t('Prices are per person for this route. Children under 6 travel free without a seat.')}</p>
+          <p className="summary-note">{t('Prices per person, VAT included. Children under 6 travel free without a seat.')}</p>
         </aside>
       </div>
+
+      {step === 'seats' && (
+        <div className="mobile-bar">
+          <div>
+            <b className="tabular">{fmtMoney(total)}</b>
+            <span className="muted"> · {sel.length}/{count} {t('places selected')}{remaining !== null && sel.length > 0 ? ` · ${mmss}` : ''}</span>
+          </div>
+          <button className="btn btn--primary" disabled={!ready} onClick={() => setStep('details')}>
+            {ready ? t('Continue') : t('Select {n} more', { n: count - sel.length })}
+          </button>
+        </div>
+      )}
 
       {toast && <div className={`toast toast--${toast.kind}`} role="status">{toast.text}</div>}
     </div>

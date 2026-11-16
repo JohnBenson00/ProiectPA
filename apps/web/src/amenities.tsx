@@ -46,17 +46,17 @@ export function AmenityIcon({ code, size = 16, withLabel = false }: { code: stri
   if (!a) return null;
   const Icon = a.icon;
   return (
-    <span className={withLabel ? 'amenity amenity--label' : 'amenity'} title={t(a.label)} style={{ ['--a' as string]: a.color }}>
-      <Icon size={size} aria-hidden />
+    <span className={withLabel ? 'amenity amenity--label' : 'amenity'} title={t(a.label)}>
+      <Icon size={size} strokeWidth={1.7} aria-hidden />
       {withLabel ? <span>{t(a.label)}</span> : <span className="sr-only">{t(a.label)}</span>}
     </span>
   );
 }
 
-export function AmenityList({ codes, size = 16, withLabel = false, max }: { codes: string[]; size?: number; withLabel?: boolean; max?: number }) {
+export function AmenityList({ codes, size = 15, withLabel = false, max }: { codes: string[]; size?: number; withLabel?: boolean; max?: number }) {
   const shown = max ? codes.slice(0, max) : codes;
   return (
-    <span className="amenity-list">
+    <span className={`amenity-list${withLabel ? ' amenity-list--labels' : ''}`}>
       {shown.map((c) => <AmenityIcon key={c} code={c} size={size} withLabel={withLabel} />)}
       {max && codes.length > max ? <span className="amenity-more">+{codes.length - max}</span> : null}
     </span>

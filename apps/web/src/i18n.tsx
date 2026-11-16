@@ -4,20 +4,24 @@ export type Lang = 'ro' | 'en';
 
 /** English text is the key. These entries are codes that also need an English label. */
 const EN: Record<string, string> = {
-  seat_free: 'Free', seat_selected: 'Selected', seat_held: 'Being booked by someone else', seat_sold: 'Taken', seat_used: 'Boarded', seat_blocked: 'Not available',
+  seat_free: 'Available', seat_selected: 'Your selection', seat_held: 'Reservation in progress', seat_sold: 'Occupied', seat_used: 'Boarded', seat_blocked: 'Unavailable',
+  Wagon: 'Coach', 'Previous wagon': 'Previous coach', 'Next wagon': 'Next coach', 'Find your wagon': 'Find your coach', W: 'C', wagons: 'coaches',
+  'The locomotive is at the front. Your wagons are highlighted – count from the locomotive.': 'The locomotive is at the front. Your coach is highlighted – count from the locomotive.',
   step_seats: 'Seats', step_details: 'Details', step_pay: 'Payment', step_ticket: 'Ticket',
   avail_high: 'many seats', avail_mid: 'filling up', avail_low: 'almost full', avail_none: 'no trains',
   scan_OK: 'Valid – board', scan_USED: 'Already used', scan_WRONG_TRIP: 'Wrong departure', scan_CANCELLED: 'Cancelled ticket', scan_INVALID: 'Invalid ticket',
   ADULT: 'Adult', CHILD: 'Child', STUDENT: 'Student', SENIOR: 'Senior', ADMIN: 'administrator', CONDUCTOR: 'conductor',
+  pick_together: 'seats together', 'pick_same row': 'same row', pick_single: 'best match', pick_split: 'not all together',
 };
 
 const RO: Record<string, string> = {
   ...{
-    seat_free: 'Liber', seat_selected: 'Ales de tine', seat_held: 'În curs de rezervare', seat_sold: 'Ocupat', seat_used: 'Îmbarcat', seat_blocked: 'Indisponibil',
+    seat_free: 'Liber', seat_selected: 'Selectat', seat_held: 'Rezervare în curs', seat_sold: 'Ocupat', seat_used: 'Îmbarcat', seat_blocked: 'Indisponibil',
     step_seats: 'Locuri', step_details: 'Date', step_pay: 'Plată', step_ticket: 'Bilet',
     avail_high: 'multe locuri', avail_mid: 'se ocupă', avail_low: 'aproape plin', avail_none: 'fără curse',
     scan_OK: 'Valid – poftiți', scan_USED: 'Deja folosit', scan_WRONG_TRIP: 'Altă cursă', scan_CANCELLED: 'Bilet anulat', scan_INVALID: 'Bilet invalid',
     ADULT: 'Adult', CHILD: 'Copil', STUDENT: 'Student', SENIOR: 'Pensionar', ADMIN: 'administrator', CONDUCTOR: 'controlor',
+    pick_together: 'locuri alăturate', 'pick_same row': 'pe același rând', pick_single: 'cea mai bună potrivire', pick_split: 'nu toate alăturate',
   },
   // amenities & seat attributes
   '1st class': 'Clasa 1', 'Accessible': 'Accesibil', 'Accessible toilet': 'Toaletă accesibilă', 'Air conditioning': 'Aer condiționat',
@@ -86,7 +90,7 @@ const RO: Record<string, string> = {
   'Print / PDF': 'Tipărește / PDF', 'Reason (optional)': 'Motiv (opțional)', 'Recurring schedule': 'Program recurent', 'Refresh': 'Reîncarcă',
   'Remove seat {s}': 'Elimină locul {s}', 'Remove wagon': 'Elimină vagonul', 'Route': 'Ruta', 'Routes': 'Rute', 'Saved.': 'Salvat.',
   'Scan with camera': 'Scanează cu camera', 'Scheduled': 'Programată', 'Seat details': 'Detalii loc', 'Seat map': 'Harta locurilor', 'Seat plan': 'Planul locurilor',
-  'Seats held for': 'Locuri rezervate încă', 'Select {n} more': 'Mai alege {n}', 'Show on map': 'Arată pe hartă',
+  'Seats held for': 'Locuri reținute încă', 'Select {n} more': 'Mai alege {n}', 'Show on map': 'Arată pe hartă',
   'Show the QR code to the conductor when boarding. Save this page to your home screen to open it offline.': 'Arată codul QR controlorului la urcare. Salvează pagina pe ecranul principal ca s-o poți deschide și fără internet.',
   'Show tickets': 'Arată biletele', 'Skip to content': 'Sari la conținut', 'Sold': 'Vândute', 'Sold out': 'Epuizat',
   'Sorry, seat {s} was just taken by someone else.': 'Ne pare rău, locul {s} tocmai a fost ocupat de altcineva.', 'Staff login': 'Autentificare personal',
@@ -113,7 +117,13 @@ const RO: Record<string, string> = {
   '{c} departures created, {s} already existed.': '{c} curse create, {s} existau deja.',
   '{k} passengers keep their seat, {m} will be moved to similar seats, {u} do not fit. Continue?': '{k} călători își păstrează locul, {m} vor fi mutați pe locuri asemănătoare, {u} nu încap. Continui?',
   'Seat': 'Loc', 'Berth': 'Pat', 'Wheelchair space': 'Loc pentru scaun rulant', 'seat': 'loc', 'berth': 'pat', 'wheelchair space': 'loc pentru scaun rulant',
-  'Train not found': 'Trenul nu a fost găsit', 'Schedule': 'Program', 'Fleet': 'Flotă', 'Scanner': 'Scanner',
+  'Train not found': 'Trenul nu a fost găsit',
+  'Seat preferences': 'Preferințe loc', 'Auto-assign seats': 'Alocare automată', 'Uses your preferences': 'Ține cont de preferințe',
+  'Keeps your group together': 'Locuri alăturate pentru grup', 'Your reservation': 'Rezervarea ta', 'passenger': 'călător',
+  'Select seats on the plan or use automatic assignment.': 'Alege locurile pe plan sau folosește alocarea automată.',
+  'Prices per person, VAT included. Children under 6 travel free without a seat.': 'Prețuri de persoană, TVA inclus. Copiii sub 6 ani călătoresc gratuit, fără loc.',
+  '{n} intermediate stops': '{n} opriri intermediare', 'direct': 'direct', 'Fares': 'Tarife', 'Facilities': 'Dotări',
+  'About this coach': 'Despre vagon', 'free seats': 'locuri libere', 'Class': 'Clasa', 'Backrest': 'Spătar', 'Strollers': 'Cărucioare', 'Schedule': 'Program', 'Fleet': 'Flotă', 'Scanner': 'Scanner',
   '{ok}/{n} passengers boarded': '{ok}/{n} călători îmbarcați',
   'Not a valid ticket (signature check failed or unknown code).': 'Bilet nevalid (semnătură greșită sau cod necunoscut).',
   'Not enough free seats together for this party': 'Nu sunt destule locuri libere pentru acest grup',
@@ -134,7 +144,8 @@ export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
     try { return (localStorage.getItem('lang') as Lang) || (navigator.language.startsWith('ro') ? 'ro' : 'en'); } catch { return 'ro'; }
   });
-  const setLang = (l: Lang) => { setLangState(l); try { localStorage.setItem('lang', l); } catch { /* ignore */ } };
+  const setLang = (l: Lang) => { document.documentElement.lang = l; setLangState(l); try { localStorage.setItem('lang', l); } catch { /* ignore */ } };
+  if (typeof document !== 'undefined') document.documentElement.lang = lang;
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
   return <LangCtx.Provider value={{ lang, setLang }}>{children}</LangCtx.Provider>;
 }

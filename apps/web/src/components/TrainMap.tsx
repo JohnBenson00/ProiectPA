@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Cell, SeatState, Train, Wagon } from '../types';
 import { TrainStrip } from './TrainStrip';
 import { WagonPlan } from './WagonPlan';
@@ -37,35 +37,44 @@ export function TrainMap({ train, active, setActive, stateOf, onSeat, dimmed, de
   const t = useT();
   const [ref, width] = useWidth<HTMLDivElement>();
   const wagon = train.wagons.find((w) => w.number === active) ?? train.wagons[0];
-  const vertical = width < 720;
+  const vertical = width < 640;
   const layout = wagon.layoutData!;
-  const scale = vertical ? Math.max(36, Math.min(58, (width - 40) / (layout.width + 1))) : undefined;
+  // fit the whole coach into the column on desktop; rotate it on narrow screens
+  const scale = vertical
+    ? Math.max(34, Math.min(42, (width - 32) / (layout.width + 1.5)))
+    : Math.max(22, Math.min(31, (width - 8) / (layout.length + 1.5)));
   const idx = train.wagons.indexOf(wagon);
+  const free = stats?.[wagon.id]?.free;
 
   return (
-    <div className="train-map" ref={ref}>
-      <div className="direction"><ArrowLeft size={14} aria-hidden /> {t('Direction of travel')}</div>
-      <TrainStrip
-        color={train.color}
-        locoName={train.locomotive}
-        active={wagon.number}
-        onSelect={setActive}
-        wagons={train.wagons.map((w) => ({ ...w, free: stats?.[w.id]?.free, capacity: stats?.[w.id]?.capacity ?? w.capacity, mine: stats?.[w.id]?.mine }))}
-      />
-
-      <div className="wagon-head">
-        <button className="icon-btn" onClick={() => setActive(train.wagons[idx - 1].number)} disabled={idx === 0} aria-label={t('Previous wagon')}>
-          <ChevronLeft size={18} />
-        </button>
-        <div className="wagon-title">
-          <h3>
-            {t('Wagon')} {wagon.number}
-            {wagon.classLabel && <span className="badge">{t('class')} {wagon.classLabel}</span>}
-          </h3>
-          <span className="muted">{t(wagon.name)}</span>
+    <section className="train-map" ref={ref} aria-label={t('Seat plan')}>
+      <div className="map-row map-row--seq">
+        <div className="seq-label">
+          <span className="eyebrow">{t('Train composition')}</span>
+          <span className="direction">← {t('Direction of travel')}</span>
         </div>
+        <TrainStrip
+          color={train.color}
+          locoName={train.locomotive}
+          active={wagon.number}
+          onSelect={setActive}
+          wagons={train.wagons.map((w) => ({ ...w, free: stats?.[w.id]?.free, capacity: stats?.[w.id]?.capacity ?? w.capacity, mine: stats?.[w.id]?.mine }))}
+        />
+      </div>
+
+      <div className="map-row coach-bar">
+        <button className="icon-btn" onClick={() => setActive(train.wagons[idx - 1].number)} disabled={idx === 0} aria-label={t('Previous wagon')}>
+          <ChevronLeft size={16} />
+        </button>
+        <h3 className="coach-title">
+          {t('Wagon')} {wagon.number}
+          <span className="coach-meta">
+            {wagon.classLabel && <> · {t('Class')} {wagon.classLabel}</>} · {t(wagon.name)}
+          </span>
+        </h3>
+        {layout.bookable && free !== undefined && <span className="coach-count">{free} {t('free seats')}</span>}
         <button className="icon-btn" onClick={() => setActive(train.wagons[idx + 1].number)} disabled={idx === train.wagons.length - 1} aria-label={t('Next wagon')}>
-          <ChevronRight size={18} />
+          <ChevronRight size={16} />
         </button>
       </div>
 
@@ -87,21 +96,26 @@ export function TrainMap({ train, active, setActive, stateOf, onSeat, dimmed, de
         />
       </div>
 
-      {layout.bookable && (
-        <div className="legend" aria-label={t('Legend')}>
+      {layout.bookable ? (
+        <ul className="legend" aria-label={t('Legend')}>
           {legend.map((s) => (
-            <span key={s} className="legend-item"><span className={`legend-swatch seat--${s}`} />{t(`seat_${s}`)}</span>
+            <li key={s}><span className={`legend-swatch sw--${s}`} />{t(`seat_${s}`)}</li>
           ))}
-          <span className="legend-item"><span className="legend-swatch legend-back" />{t('Backrest (seat faces away from it)')}</span>
-        </div>
+          <li><span className="legend-swatch sw--back" />{t('Backrest')}</li>
+        </ul>
+      ) : (
+        <p className="map-note">{t('This wagon has no reservable seats. It is open to all passengers of the train.')}</p>
       )}
 
-      <div className="wagon-info">
-        <p>{t(wagon.description)}</p>
-        <AmenityList codes={wagon.amenities} withLabel />
-        {!layout.bookable && <p className="note">{t('This wagon has no reservable seats. It is open to all passengers of the train.')}</p>}
-        {wagonExtra?.(wagon)}
+      <div className="map-row coach-info">
+        <dl className="info-dl">
+          <dt>{t('Facilities')}</dt>
+          <dd><AmenityList codes={wagon.amenities} withLabel /></dd>
+          <dt>{t('About this coach')}</dt>
+          <dd>{t(wagon.description)}</dd>
+          {wagonExtra?.(wagon)}
+        </dl>
       </div>
-    </div>
+    </section>
   );
 }
