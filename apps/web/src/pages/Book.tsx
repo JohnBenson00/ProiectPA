@@ -20,7 +20,7 @@ export function Book() {
   const [trip, setTrip] = useState<TripDetail | null>(null);
   const [types, setTypes] = useState<PassengerType[]>([]);
   const [avail, setAvail] = useState<Availability | null>(null);
-  const [count, setCount] = useState(2);
+  const [count, setCount] = useState(1);
   const [sel, setSel] = useState<Sel[]>([]);
   const [prefs, setPrefs] = useState<string[]>([]);
   const [prefsOpen, setPrefsOpen] = useState(false);
