@@ -5,6 +5,30 @@ in the staff seat map and can be scanned by the conductor on another phone.
 
 Result: **https://trains.hymemory.xyz** (any subdomain works; your main site on `hymemory.xyz` is not touched).
 
+## Quickest: one command over Tailscale
+
+If the Pi is in your Tailscale network, this does everything (installs Docker and Tailscale if missing,
+builds, starts, and serves the site over HTTPS with a certificate from Tailscale):
+
+```bash
+git clone https://github.com/JohnBenson00/ProiectPA.git   # GitHub token as password (private repo, see step 2)
+cd ProiectPA && git checkout ccr-6a3246be-n0ixbk
+./deploy/pi-tailscale.sh            # only devices in your tailnet can open it
+./deploy/pi-tailscale.sh funnel     # or: public on the internet via Tailscale Funnel
+```
+
+It prints the address (`https://<pi-name>.<tailnet>.ts.net`) and the first admin password.
+Run it again after `git pull` to update; the data in `deploy/data` is kept.
+
+Once, in the Tailscale admin console:
+- **DNS** page: enable **MagicDNS** and **HTTPS Certificates** (needed for the `https://…ts.net` address and the camera scanner).
+- For `funnel` only: allow Funnel for the Pi (the command prints a link if it is not allowed yet).
+
+Notes:
+- `tailnet` mode is ideal for testing with the team and the client: only people you invite to the tailnet can open it.
+  Passengers need a public site: `funnel`, or one of the options below with your own domain (`trains.hymemory.xyz`).
+- Funnel always uses the `ts.net` address; a custom domain like `hymemory.xyz` needs option A, B or C below.
+
 ## What you need
 
 - Raspberry Pi 5 with **Raspberry Pi OS 64-bit** (Bookworm). An SSD/NVMe instead of the SD card is strongly recommended for a database.

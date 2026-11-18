@@ -31,6 +31,7 @@ These do **not** exist in production.
 
 `docker compose` in `deploy/` runs the real shared system with automatic HTTPS for your domain.
 Step-by-step guide: **[docs/DEPLOY-RASPBERRY-PI.md](docs/DEPLOY-RASPBERRY-PI.md)**.
+On a Pi in a Tailscale network it is one command: `./deploy/pi-tailscale.sh` (or `./deploy/pi-tailscale.sh funnel` to make it public).
 
 In production (`NODE_ENV=production`, the default in Docker):
 - no demo logins and no fake bookings; the first start creates `admin` with a random password (`data/initial-admin-password.txt`)
