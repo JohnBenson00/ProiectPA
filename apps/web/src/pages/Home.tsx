@@ -4,6 +4,7 @@ import { api, fmtDate, fmtDuration, fmtMoney, fmtTime } from '../api';
 import type { Route, TripSummary } from '../types';
 import { TrainStrip } from '../components/TrainStrip';
 import { AmenityList } from '../amenities';
+import { RouteStops } from '../components/RouteStops';
 import { useLang, useT } from '../i18n';
 
 interface Day { date: string; trips: number; capacity: number; free: number }
@@ -51,7 +52,12 @@ export function Home() {
             </button>
           ))}
         </div>
-        {route && <p className="muted route-desc">{t(route.description)} · {route.stops.map((s) => s.name).join(' → ')}</p>}
+        {route && (
+          <div className="route-info">
+            <p className="muted route-desc">{t(route.description)}</p>
+            <RouteStops stops={route.stops} label={`${t('Route and stops')}: ${route.name}`} />
+          </div>
+        )}
       </section>
 
       <section aria-label={t('Choose the day')}>

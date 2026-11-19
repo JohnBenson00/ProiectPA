@@ -137,6 +137,7 @@ const RO: Record<string, string> = {
   'Stop this rule? No new departures will be generated.': 'Oprești regula? Nu se vor mai genera curse noi.', 'Choose at least one weekday': 'Alege cel puțin o zi',
   'With your booking code and this email you can open your tickets at any time.': 'Cu codul rezervării și acest email îți poți deschide biletele oricând.',
   'Contact details are too long': 'Datele de contact sunt prea lungi', 'Invalid seat selection': 'Selecție de locuri invalidă',
+  'Route and stops': 'Traseu și opriri', departure: 'plecare', 'next day': 'a doua zi',
   'Seat preferences': 'Preferințe loc', held: 'reținute', 'Menu': 'Meniu', 'Place': 'Loc', 'Fare type': 'Tarif', 'Price': 'Preț',
   'Selected places': 'Locuri selectate', 'accessible': 'accesibil', 'Auto-assign seats': 'Alocare automată', 'Uses your preferences': 'Ține cont de preferințe',
   'Keeps your group together': 'Locuri alăturate pentru grup', 'Your reservation': 'Rezervarea ta', 'passenger': 'călător',

@@ -5,6 +5,7 @@ import { CheckCircle2, Printer, XCircle } from 'lucide-react';
 import { api, fmtDate, fmtMoney, fmtTime } from '../api';
 import type { Booking, Ticket as T } from '../types';
 import { TrainStrip } from '../components/TrainStrip';
+import { RouteStops } from '../components/RouteStops';
 import { SEAT_ATTRS } from '../amenities';
 import { useLang, useT } from '../i18n';
 
@@ -71,6 +72,11 @@ export function TicketPage() {
           )}
         </div>
       </header>
+
+      <section className="card ticket-route">
+        <h2>{t('Route and stops')}</h2>
+        <RouteStops stops={b.trip.route.stops} departure={b.trip.departure} label={`${t('Route and stops')}: ${b.trip.route.name}`} />
+      </section>
 
       <section className="card find-wagon">
         <h2>{t('Find your wagon')}</h2>

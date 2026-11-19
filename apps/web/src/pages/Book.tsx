@@ -4,6 +4,7 @@ import { Clock, Info, Minus, Plus, X } from 'lucide-react';
 import { api, ApiError, fmtDate, fmtDuration, fmtMoney, fmtTime, sessionId } from '../api';
 import type { Availability, Cell, PassengerType, SeatState, TripDetail, Wagon } from '../types';
 import { TrainMap } from '../components/TrainMap';
+import { RouteStops } from '../components/RouteStops';
 import { SEAT_ATTRS } from '../amenities';
 import { useLang, useT } from '../i18n';
 
@@ -24,6 +25,7 @@ export function Book() {
   const [sel, setSel] = useState<Sel[]>([]);
   const [prefs, setPrefs] = useState<string[]>([]);
   const [prefsOpen, setPrefsOpen] = useState(false);
+  const [showStops, setShowStops] = useState(false);
   const [emailOn, setEmailOn] = useState(false);
   const [active, setActive] = useState(1);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
@@ -239,7 +241,10 @@ export function Book() {
               {fmtDate(trip.departure, lang, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               <span className="sep">·</span>{trip.route.code} <Link to={`/trains/${trip.train.id}`}>{trip.train.name}</Link>
               <span className="sep">·</span>{fmtDuration(trip.route.duration_min)}
-              <span className="sep">·</span>{between ? t('{n} intermediate stops', { n: between }) : t('direct')}
+              <span className="sep">·</span>
+              <button className="link-btn stops-toggle" aria-expanded={showStops} aria-controls="journey-stops" onClick={() => setShowStops((v) => !v)}>
+                {between ? t('{n} intermediate stops', { n: between }) : t('direct')} {showStops ? '▴' : '▾'}
+              </button>
             </p>
           </div>
           <ol className="steps" aria-label={t('Steps')}>
@@ -250,6 +255,11 @@ export function Book() {
             ))}
           </ol>
         </div>
+        {showStops && (
+          <div className="journey-stops" id="journey-stops">
+            <RouteStops stops={stops} departure={trip.departure} label={`${t('Route and stops')}: ${trip.route.name}`} />
+          </div>
+        )}
       </div>
 
       <div className="booking-grid">
